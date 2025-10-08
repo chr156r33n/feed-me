@@ -288,6 +288,43 @@ class BatchSaver:
                 logger.error(f"Failed to load batch file {batch_file}: {e}")
         
         return all_results
+    
+    def list_batch_sessions(self) -> List[Dict[str, Any]]:
+        """List all batch processing sessions."""
+        sessions = []
+        
+        # Group files by timestamp
+        timestamp_groups = {}
+        for file_path in self.output_dir.glob("batch_*.json"):
+            parts = file_path.stem.split("_")
+            if len(parts) >= 3:
+                timestamp = "_".join(parts[2:])  # Everything after batch_XXXX_
+                if timestamp not in timestamp_groups:
+                    timestamp_groups[timestamp] = []
+                timestamp_groups[timestamp].append(file_path)
+        
+        for timestamp, files in timestamp_groups.items():
+            # Sort files by batch number
+            files.sort(key=lambda x: int(x.stem.split("_")[1]))
+            
+            # Get progress info
+            progress_file = self.output_dir / f"progress_{timestamp}.json"
+            progress_data = None
+            if progress_file.exists():
+                try:
+                    with open(progress_file, 'r') as f:
+                        progress_data = json.load(f)
+                except:
+                    pass
+            
+            sessions.append({
+                'timestamp': timestamp,
+                'batch_files': files,
+                'progress_data': progress_data,
+                'total_batches': len(files)
+            })
+        
+        return sorted(sessions, key=lambda x: x['timestamp'], reverse=True)
 
 
 class ProductFeedEvaluator:
