@@ -203,7 +203,9 @@ class _LLM:
                     return json.loads(text)
                 except json.JSONDecodeError:
                     # Best-effort extraction of first JSON array/object
-                    start = min((i for i in [text.find("[{"), text.find("[\n{"), text.find("[") if i != -1]), default=-1)
+                    indices = [text.find("[{"), text.find("[\n{"), text.find("[")]
+                    valid_indices = [i for i in indices if i != -1]
+                    start = min(valid_indices) if valid_indices else -1
                     if start != -1:
                         snippet = text[start:]
                         # balance brackets roughly
