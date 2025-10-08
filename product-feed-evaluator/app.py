@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Tuple, Callable, Optional
 
 import pandas as pd
 
-from prompt import (
+from prompts import (
     QUESTION_GENERATION_PROMPT,
     QUESTION_QA_PROMPT,
     ANSWER_JUDGEMENT_PROMPT,
