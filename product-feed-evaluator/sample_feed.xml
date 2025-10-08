@@ -1,180 +1,163 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>Sample Product Feed</title>
-    <link>https://example-store.com</link>
-    <description>Sample Google Shopping feed for testing</description>
-    
+    <title>Example Store</title>
+    <link>https://www.example.com/</link>
+    <description>Sample Google Shopping feed with 10 products</description>
+
     <item>
-      <g:id>12345</g:id>
-      <title>Modern Wireless Bluetooth Headphones</title>
-      <description>High-quality wireless headphones with noise cancellation, 30-hour battery life, and premium sound quality. Perfect for music lovers and professionals.</description>
-      <link>https://example-store.com/products/wireless-headphones</link>
-      <g:image_link>https://example-store.com/images/headphones.jpg</g:image_link>
-      <g:brand>AudioTech</g:brand>
-      <g:price>199.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-IPH15PRO-128</g:id>
+      <title>Apple iPhone 15 Pro 128GB – Titanium</title>
+      <description>Apple’s 6.1-inch Pro phone with A17 Pro chip and advanced cameras.</description>
+      <link>https://www.example.com/products/iphone-15-pro-128</link>
+      <g:image_link>https://www.example.com/images/iphone-15-pro.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Electronics > Audio > Headphones</g:product_type>
-      <g:color>Black</g:color>
-      <g:material>Plastic, Metal</g:material>
-      <g:gtin>1234567890123</g:gtin>
-      <g:mpn>ATH-WH1000XM4</g:mpn>
+      <g:price>949.00 GBP</g:price>
+      <g:brand>Apple</g:brand>
+      <g:mpn>iPhone15Pro-128</g:mpn>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12346</g:id>
-      <title>Ergonomic Office Chair</title>
-      <description>Comfortable ergonomic office chair with lumbar support, adjustable height, and breathable mesh back. Ideal for long work sessions.</description>
-      <link>https://example-store.com/products/office-chair</link>
-      <g:image_link>https://example-store.com/images/chair.jpg</g:image_link>
-      <g:brand>ComfortSeat</g:brand>
-      <g:price>299.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-GXS24U-256</g:id>
+      <title>Samsung Galaxy S24 Ultra 256GB</title>
+      <description>Flagship Android with long battery life and a versatile quad camera.</description>
+      <link>https://www.example.com/products/galaxy-s24-ultra-256</link>
+      <g:image_link>https://www.example.com/images/galaxy-s24-ultra.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Furniture > Office Furniture > Chairs</g:product_type>
-      <g:color>Black</g:color>
-      <g:material>Mesh, Steel, Plastic</g:material>
-      <g:gtin>2345678901234</g:gtin>
-      <g:mpn>CS-EC-001</g:mpn>
+      <g:price>1199.00 GBP</g:price>
+      <g:brand>Samsung</g:brand>
+      <g:mpn>SM-S928-256</g:mpn>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12347</g:id>
-      <title>Stainless Steel Water Bottle</title>
-      <description>Insulated stainless steel water bottle that keeps drinks cold for 24 hours or hot for 12 hours. BPA-free and leak-proof design.</description>
-      <link>https://example-store.com/products/water-bottle</link>
-      <g:image_link>https://example-store.com/images/bottle.jpg</g:image_link>
-      <g:brand>HydroMax</g:brand>
-      <g:price>24.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-SONY-WH1000XM5</g:id>
+      <title>Sony WH-1000XM5 Wireless Noise-Cancelling Headphones</title>
+      <description>Over-ear Bluetooth headphones with top-tier ANC and clear calls.</description>
+      <link>https://www.example.com/products/sony-wh-1000xm5</link>
+      <g:image_link>https://www.example.com/images/wh-1000xm5.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Sports & Outdoors > Hydration</g:product_type>
-      <g:color>Silver</g:color>
-      <g:material>Stainless Steel</g:material>
-      <g:gtin>3456789012345</g:gtin>
-      <g:mpn>HM-SB-500</g:mpn>
+      <g:price>279.00 GBP</g:price>
+      <g:brand>Sony</g:brand>
+      <g:mpn>WH1000XM5B</g:mpn>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Headphones</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12348</g:id>
-      <title>Smart Fitness Watch</title>
-      <description>Advanced fitness tracking watch with heart rate monitoring, GPS, sleep tracking, and 7-day battery life. Water-resistant up to 50 meters.</description>
-      <link>https://example-store.com/products/fitness-watch</link>
-      <g:image_link>https://example-store.com/images/watch.jpg</g:image_link>
-      <g:brand>FitTech</g:brand>
-      <g:price>249.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-NSWITCH-OLED</g:id>
+      <title>Nintendo Switch OLED Model – White</title>
+      <description>Hybrid console with a 7-inch OLED screen for vivid handheld play.</description>
+      <link>https://www.example.com/products/nintendo-switch-oled</link>
+      <g:image_link>https://www.example.com/images/switch-oled.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Electronics > Wearables > Smartwatches</g:product_type>
-      <g:color>Black</g:color>
-      <g:material>Aluminum, Silicone</g:material>
-      <g:gtin>4567890123456</g:gtin>
-      <g:mpn>FT-SW-2024</g:mpn>
+      <g:price>299.00 GBP</g:price>
+      <g:brand>Nintendo</g:brand>
+      <g:mpn>HEG-S-KAAAA-UKV</g:mpn>
+      <g:google_product_category>Electronics &gt; Video Game Consoles</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12349</g:id>
-      <title>Organic Cotton T-Shirt</title>
-      <description>Soft, comfortable organic cotton t-shirt made from 100% organic cotton. Available in multiple colors and sizes. Machine washable.</description>
-      <link>https://example-store.com/products/tshirt</link>
-      <g:image_link>https://example-store.com/images/tshirt.jpg</g:image_link>
-      <g:brand>EcoWear</g:brand>
-      <g:price>19.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-DYSON-V15-DETECT</g:id>
+      <title>Dyson V15 Detect Cordless Vacuum</title>
+      <description>Powerful cordless cleaner with laser to reveal fine dust on hard floors.</description>
+      <link>https://www.example.com/products/dyson-v15-detect</link>
+      <g:image_link>https://www.example.com/images/dyson-v15.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Clothing & Accessories > Shirts & Tops</g:product_type>
-      <g:color>White</g:color>
-      <g:size>M</g:size>
-      <g:material>100% Organic Cotton</g:material>
-      <g:gtin>5678901234567</g:gtin>
-      <g:mpn>EW-TS-001</g:mpn>
+      <g:price>599.00 GBP</g:price>
+      <g:brand>Dyson</g:brand>
+      <g:mpn>V15-Detect</g:mpn>
+      <g:google_product_category>Home &amp; Garden &gt; Housekeeping &gt; Vacuum Cleaners</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12350</g:id>
-      <title>LED Desk Lamp</title>
-      <description>Adjustable LED desk lamp with touch controls, multiple brightness levels, and USB charging port. Energy-efficient and eye-friendly lighting.</description>
-      <link>https://example-store.com/products/desk-lamp</link>
-      <g:image_link>https://example-store.com/images/lamp.jpg</g:image_link>
-      <g:brand>LumiTech</g:brand>
-      <g:price>59.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-INSTANTPOT-DUO-60</g:id>
+      <title>Instant Pot Duo 7-in-1 Multi-Cooker 6L</title>
+      <description>Pressure cooker, slow cooker, rice cooker and more in one countertop unit.</description>
+      <link>https://www.example.com/products/instant-pot-duo-60</link>
+      <g:image_link>https://www.example.com/images/instant-pot-duo.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Home & Garden > Lighting > Desk Lamps</g:product_type>
-      <g:color>White</g:color>
-      <g:material>Aluminum, Plastic</g:material>
-      <g:gtin>6789012345678</g:gtin>
-      <g:mpn>LT-DL-2024</g:mpn>
+      <g:price>89.99 GBP</g:price>
+      <g:brand>Instant Pot</g:brand>
+      <g:mpn>Duo60-UK</g:mpn>
+      <g:google_product_category>Home &amp; Garden &gt; Kitchen &amp; Dining &gt; Kitchen Appliances &gt; Multi-Cookers</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12351</g:id>
-      <title>Ceramic Coffee Mug</title>
-      <description>Handcrafted ceramic coffee mug with ergonomic handle and microwave-safe design. Perfect for coffee, tea, or hot chocolate.</description>
-      <link>https://example-store.com/products/coffee-mug</link>
-      <g:image_link>https://example-store.com/images/mug.jpg</g:image_link>
-      <g:brand>Artisan Pottery</g:brand>
-      <g:price>12.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-LEGO-10311</g:id>
+      <title>LEGO Icons Orchid (10311)</title>
+      <description>Buildable orchid display with adjustable blooms for home decor.</description>
+      <link>https://www.example.com/products/lego-orchid-10311</link>
+      <g:image_link>https://www.example.com/images/lego-10311.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Home & Garden > Kitchen & Dining > Drinkware</g:product_type>
-      <g:color>Blue</g:color>
-      <g:material>Ceramic</g:material>
-      <g:gtin>7890123456789</g:gtin>
-      <g:mpn>AP-CM-001</g:mpn>
+      <g:price>44.99 GBP</g:price>
+      <g:brand>LEGO</g:brand>
+      <g:mpn>10311</g:mpn>
+      <g:google_product_category>Toys &amp; Games &gt; Toys &gt; Building Toys &gt; Construction Sets</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12352</g:id>
-      <title>Yoga Mat</title>
-      <description>Non-slip yoga mat made from eco-friendly TPE material. Extra thick for comfort and includes carrying strap. Perfect for yoga, pilates, and fitness.</description>
-      <link>https://example-store.com/products/yoga-mat</link>
-      <g:image_link>https://example-store.com/images/yoga-mat.jpg</g:image_link>
-      <g:brand>ZenFit</g:brand>
-      <g:price>34.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-KINDLE-PW-11</g:id>
+      <title>Kindle Paperwhite 11th Gen – 8GB</title>
+      <description>Water-resistant e-reader with a sharp 6.8-inch display and adjustable warm light.</description>
+      <link>https://www.example.com/products/kindle-paperwhite-11</link>
+      <g:image_link>https://www.example.com/images/kindle-paperwhite-11.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Sports & Outdoors > Exercise & Fitness > Yoga</g:product_type>
-      <g:color>Purple</g:color>
-      <g:material>TPE (Thermoplastic Elastomer)</g:material>
-      <g:gtin>8901234567890</g:gtin>
-      <g:mpn>ZF-YM-001</g:mpn>
+      <g:price>149.99 GBP</g:price>
+      <g:brand>Amazon</g:brand>
+      <g:mpn>PW-11-8GB</g:mpn>
+      <g:google_product_category>Media &gt; Books &gt; E-Book Readers</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12353</g:id>
-      <title>Wireless Phone Charger</title>
-      <description>Fast wireless charging pad compatible with iPhone and Android devices. LED indicator and safety features included.</description>
-      <link>https://example-store.com/products/wireless-charger</link>
-      <g:image_link>https://example-store.com/images/charger.jpg</g:image_link>
-      <g:brand>PowerTech</g:brand>
-      <g:price>29.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-LOGI-MX3S</g:id>
+      <title>Logitech MX Master 3S Wireless Mouse</title>
+      <description>Ergonomic mouse with fast-scroll wheel and quiet, precise clicks.</description>
+      <link>https://www.example.com/products/logitech-mx-master-3s</link>
+      <g:image_link>https://www.example.com/images/mx-master-3s.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Electronics > Mobile Phone Accessories > Chargers</g:product_type>
-      <g:color>Black</g:color>
-      <g:material>Plastic, Metal</g:material>
-      <g:gtin>9012345678901</g:gtin>
-      <g:mpn>PT-WC-001</g:mpn>
+      <g:price>89.99 GBP</g:price>
+      <g:brand>Logitech</g:brand>
+      <g:mpn>910-006559</g:mpn>
+      <g:google_product_category>Electronics &gt; Computers &gt; Computer Accessories &gt; Pointing Devices &gt; Computer Mice</g:google_product_category>
     </item>
-    
+
     <item>
-      <g:id>12354</g:id>
-      <title>Bamboo Cutting Board</title>
-      <description>Eco-friendly bamboo cutting board with juice groove and non-slip feet. Naturally antimicrobial and easy to clean. Perfect for food preparation.</description>
-      <link>https://example-store.com/products/cutting-board</link>
-      <g:image_link>https://example-store.com/images/cutting-board.jpg</g:image_link>
-      <g:brand>EcoKitchen</g:brand>
-      <g:price>24.99</g:price>
-      <g:availability>in stock</g:availability>
+      <g:id>SKU-NIKE-AF1-07</g:id>
+      <title>Nike Air Force 1 ’07 Men’s Shoes – White</title>
+      <description>Classic low-top leather trainers with cushioned midsole.</description>
+      <link>https://www.example.com/products/nike-air-force-1-07-white</link>
+      <g:image_link>https://www.example.com/images/air-force-1-07-white.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
       <g:condition>new</g:condition>
-      <g:product_type>Home & Garden > Kitchen & Dining > Kitchen Tools</g:product_type>
-      <g:color>Natural</g:color>
-      <g:material>Bamboo</g:material>
-      <g:gtin>0123456789012</g:gtin>
-      <g:mpn>EK-CB-001</g:mpn>
+      <g:price>109.95 GBP</g:price>
+      <g:brand>Nike</g:brand>
+      <g:mpn>315122-111</g:mpn>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Shoes</g:google_product_category>
     </item>
-    
+
+    <item>
+      <g:id>SKU-BREWISTA-ARTISAN-600</g:id>
+      <title>Brewista Artisan Gooseneck Kettle 600ml – Black</title>
+      <description>Variable-temperature pour-over kettle with precise flow control.</description>
+      <link>https://www.example.com/products/brewista-artisan-600ml</link>
+      <g:image_link>https://www.example.com/images/brewista-artisan-600.jpg</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:price>119.00 GBP</g:price>
+      <g:brand>Brewista</g:brand>
+      <g:mpn>BW600-BLK</g:mpn>
+      <g:google_product_category>Home &amp; Garden &gt; Kitchen &amp; Dining &gt; Kitchen Appliances &gt; Electric Kettles</g:google_product_category>
+    </item>
+
   </channel>
 </rss>
