@@ -6,7 +6,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from feed_parser import FeedParser
-from evaluator_v2 import ProductFeedEvaluator
+from evaluator_v3 import ProductFeedEvaluator
 
 
 def _on_progress(update: dict):
@@ -34,6 +34,11 @@ def main():
         batch_size = st.slider("Batch size", min_value=5, max_value=100, value=20, step=5)
 
         debug = st.checkbox("Debug mode (include error rows)", value=False)
+        
+        # Batch saving options
+        st.markdown("#### Batch Processing")
+        enable_batch_saving = st.checkbox("Enable batch saving", value=True, help="Save intermediate results to avoid data loss on large runs")
+        resume_evaluation = st.checkbox("Resume from previous run", value=False, help="Continue from where the last evaluation stopped")
 
         if st.button("Test OpenAI API"):
             if not api_key:
@@ -97,26 +102,38 @@ def main():
     start = st.button("Start Evaluation")
 
     if start:
-        evaluator = ProductFeedEvaluator(api_key=api_key, model=model, locale=locale)
-        progress_bar = st.progress(0)
-        status = st.empty()
+        # Handle resume functionality
+        if resume_evaluation:
+            st.info("🔄 Resuming from previous evaluation...")
+            evaluator = ProductFeedEvaluator(api_key=api_key, model=model, locale=locale)
+            results_df = evaluator.resume_evaluation(products_df)
+            if not results_df.empty:
+                st.success(f"Resumed evaluation with {len(results_df)} results")
+            else:
+                st.warning("No previous evaluation found to resume from.")
+                return
+        else:
+            evaluator = ProductFeedEvaluator(api_key=api_key, model=model, locale=locale)
+            progress_bar = st.progress(0)
+            status = st.empty()
 
-        def on_progress_local(update: dict):
-            _on_progress(update)
-            processed, total, url, msg = st.session_state.get("progress_state", (0, len(products_df), "", ""))
-            if total:
-                progress_bar.progress(min(processed / total, 1.0))
-            status.write(f"Processed {processed}/{total} {('- ' + url) if url else ''}")
+            def on_progress_local(update: dict):
+                _on_progress(update)
+                processed, total, url, msg = st.session_state.get("progress_state", (0, len(products_df), "", ""))
+                if total:
+                    progress_bar.progress(min(processed / total, 1.0))
+                status.write(f"Processed {processed}/{total} {('- ' + url) if url else ''}")
 
-        with st.spinner("Running evaluation (this may take a while)…"):
-            results_df = evaluator.evaluate_products_batch(
-                products_df=products_df,
-                selected_fields=selected_fields,
-                num_questions=num_questions,
-                batch_size=batch_size,
-                on_progress=on_progress_local,
-                debug=debug,
-            )
+            with st.spinner("Running evaluation (this may take a while)…"):
+                results_df = evaluator.evaluate_products_batch(
+                    products_df=products_df,
+                    selected_fields=selected_fields,
+                    num_questions=num_questions,
+                    batch_size=batch_size,
+                    on_progress=on_progress_local,
+                    debug=debug,
+                    resume=enable_batch_saving,
+                )
 
         if results_df.empty:
             st.error("Evaluation returned no rows. Enable Debug mode to capture errors, and verify your OpenAI API key.")
@@ -132,6 +149,78 @@ def main():
             file_name="feed_analysis.csv",
             mime="text/csv",
         )
+        
+        # Batch processing status
+        if enable_batch_saving:
+            st.markdown("---")
+            st.subheader("Batch Processing Status")
+            
+            # Show evaluation status
+            try:
+                evaluator = ProductFeedEvaluator(api_key=api_key, model=model, locale=locale)
+                status = evaluator.get_evaluation_status()
+                
+                # Display status information
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### 📊 System Health")
+                    health = status.get('health_status', {})
+                    if 'overall_status' in health:
+                        if health['overall_status'] == 'healthy':
+                            st.success("✅ System is healthy")
+                        elif health['overall_status'] == 'degraded':
+                            st.warning("⚠️ System is degraded")
+                        else:
+                            st.error(f"❌ System issues: {health.get('issues', [])}")
+                    
+                    # Memory info
+                    memory = status.get('memory_info', {})
+                    if 'current_mb' in memory:
+                        st.metric("Memory Usage", f"{memory['current_mb']:.1f} MB")
+                        if 'peak_mb' in memory:
+                            st.caption(f"Peak: {memory['peak_mb']:.1f} MB")
+                
+                with col2:
+                    st.markdown("#### 📁 Batch Information")
+                    batch_info = status.get('batch_info', {})
+                    if 'latest_session' in batch_info:
+                        st.info(f"Latest session: {batch_info['latest_session']}")
+                        if 'total_batches' in batch_info:
+                            st.metric("Total Batches", batch_info['total_batches'])
+                    
+                    # Error summary
+                    error_summary = status.get('error_summary', {})
+                    if 'total_errors' in error_summary:
+                        if error_summary['total_errors'] > 0:
+                            st.warning(f"⚠️ {error_summary['total_errors']} errors encountered")
+                        else:
+                            st.success("✅ No errors")
+                
+                # Show output directory info
+                output_dir = "output"
+                if os.path.exists(output_dir):
+                    batch_files = [f for f in os.listdir(output_dir) if f.startswith("batch_") and f.endswith(".json")]
+                    if batch_files:
+                        st.info(f"📁 Saved {len(batch_files)} batch files in '{output_dir}' directory")
+                        st.caption("Batch files are automatically saved to prevent data loss on large runs")
+                        
+                        # Cleanup option
+                        if st.button("🗑️ Clean up batch files", help="Remove all batch files after successful evaluation"):
+                            import shutil
+                            try:
+                                shutil.rmtree(output_dir)
+                                st.success("Batch files cleaned up successfully")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed to clean up batch files: {e}")
+                    else:
+                        st.info("No batch files found")
+                else:
+                    st.info("No output directory found")
+                    
+            except Exception as e:
+                st.error(f"Failed to get evaluation status: {e}")
 
 
 if __name__ == "__main__":
