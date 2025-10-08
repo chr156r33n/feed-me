@@ -73,6 +73,13 @@ def main():
             help="Number of products to process in each batch"
         )
         
+        # Debug mode toggle
+        debug_mode = st.checkbox(
+            "Enable Debug Mode",
+            value=False,
+            help="Show verbose logs and detailed progress while running"
+        )
+        
         # Field selection
         st.subheader("📋 Field Selection")
         st.markdown("Select which fields to include in product context:")
@@ -210,13 +217,43 @@ def main():
                 
                 # Evaluate products
                 with st.spinner("Evaluating products with AI..."):
+                    total_products = len(products_df)
+                    progress_bar = st.progress(0, text="Starting evaluation...")
+                    status_text = st.empty()
+                    debug_log_placeholder = None
+                    if debug_mode:
+                        st.session_state["debug_lines"] = []
+                        debug_expander = st.expander("🪲 Debug Logs", expanded=False)
+                        debug_log_placeholder = debug_expander.empty()
+
+                    def on_progress_update(state):
+                        processed = state.get("processed", 0)
+                        total = state.get("total", total_products)
+                        current_url = state.get("current_product_url", "")
+                        pct = int(processed / total * 100) if total > 0 else 0
+                        progress_bar.progress(pct, text=f"Evaluating products... {processed}/{total}")
+                        if current_url:
+                            status_text.write(f"Current: {current_url}")
+                        if debug_mode and debug_log_placeholder is not None:
+                            message = state.get("message", "")
+                            if message:
+                                st.session_state["debug_lines"].append(message)
+                                debug_log_placeholder.code("\n".join(st.session_state["debug_lines"]))
+
                     results_df = evaluator.evaluate_products_batch(
-                        products_df, selected_fields, num_questions, batch_size
+                        products_df,
+                        selected_fields,
+                        num_questions,
+                        batch_size,
+                        on_progress=on_progress_update,
+                        debug=debug_mode
                     )
                 
                 # Save results
                 timestamp = datetime.now().strftime("%Y%m%d")
-                output_file = f"output/feed_analysis_{timestamp}.csv"
+                output_dir = "output"
+                os.makedirs(output_dir, exist_ok=True)
+                output_file = f"{output_dir}/feed_analysis_{timestamp}.csv"
                 results_df.to_csv(output_file, index=False)
                 
                 st.session_state.results = results_df
