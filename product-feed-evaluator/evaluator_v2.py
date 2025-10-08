@@ -297,19 +297,21 @@ class ProductFeedEvaluator:
                 }
                 rows.append(row)
             except Exception as e:
-                if debug:
-                    rows.append({
-                        "product_url": product_url,
-                        "name_plus_context": "",
-                        "questions_json": "[]",
-                        "judgements_json": json.dumps([{"error": str(e)}]),
-                        "yes_count": 0,
-                        "partial_count": 0,
-                        "no_count": 0,
-                        "coverage_pct": 0.0,
-                        "unanswered_required_count": 0,
-                        "context_fields": ",".join(selected_fields),
-                    })
+                # Always emit an error row so the UI never shows an empty table on failures.
+                error_payload = {
+                    "product_url": product_url,
+                    "name_plus_context": "",
+                    "questions_json": "[]",
+                    "judgements_json": json.dumps([{ "error": str(e) }]),
+                    "yes_count": 0,
+                    "partial_count": 0,
+                    "no_count": 0,
+                    "coverage_pct": 0.0,
+                    "unanswered_required_count": 0,
+                    "context_fields": ",".join(selected_fields),
+                }
+                rows.append(error_payload)
+                progress(i, product_url, msg=f"Error: {e}")
             finally:
                 progress(i, product_url)
 
