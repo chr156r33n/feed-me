@@ -40,7 +40,7 @@ def main():
             "OpenAI API Key",
             type="password",
             value=os.getenv("OPENAI_API_KEY", ""),
-            help="Enter your OpenAI API key"
+            help="Enter your OpenAI API key. You can also set it in your environment variables."
         )
         
         if not api_key:

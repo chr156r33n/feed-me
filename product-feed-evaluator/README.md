@@ -22,15 +22,37 @@ pip install -r requirements.txt
 
 ### 2. Set up API Key
 
-Create a `.env` file:
+**Option 1: Environment Variable (Recommended)**
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+**Option 2: .env File**
+Create a `.env` file in the project directory:
 ```bash
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
+**Option 3: Enter in App**
+You can also enter your API key directly in the Streamlit interface.
+
+> ⚠️ **Security Note**: Never commit API keys to version control. The `.env` file is already included in `.gitignore`.
+
 ### 3. Run the Application
 
+**Option 1: Web Interface (Recommended)**
 ```bash
 streamlit run app.py
+```
+
+**Option 2: Command Line Interface**
+```bash
+python cli.py sample_feed.xml
+```
+
+For CLI options:
+```bash
+python cli.py --help
 ```
 
 ## 📋 Usage
@@ -102,13 +124,15 @@ The tool automatically flags:
 
 ```
 product-feed-evaluator/
-├── app.py                   # Streamlit application
+├── app.py                   # Streamlit web application
+├── cli.py                   # Command-line interface
 ├── prompts.py               # GPT prompt templates
 ├── feed_parser.py           # XML parsing and data cleaning
 ├── evaluator.py             # GPT interaction and scoring
 ├── requirements.txt         # Python dependencies
 ├── sample_feed.xml          # Example XML feed for testing
-├── .env                     # Environment variables (create this)
+├── .env                     # Environment variables (create this - not in git)
+├── .gitignore               # Git ignore file
 └── output/                  # Generated CSV files
     └── feed_analysis_YYYYMMDD.csv
 ```
@@ -121,7 +145,7 @@ Use the included `sample_feed.xml` to test the tool with sample product data.
 
 ### Common Issues
 
-1. **API Key Error**: Make sure your OpenAI API key is correctly set in the `.env` file
+1. **API Key Error**: Make sure your OpenAI API key is correctly set in environment variables or `.env` file
 2. **XML Parse Error**: Ensure your feed is valid XML format
 3. **Rate Limiting**: Reduce batch size if you encounter API rate limits
 4. **Memory Issues**: Process smaller batches for very large feeds
@@ -148,6 +172,15 @@ This tool is designed to be simple, explainable, and fast. Feel free to extend i
 - Category-specific dashboards
 - Integration with CMS/PIM systems
 - Readability scoring for descriptions
+
+## 🔒 Security Best Practices
+
+- **Never commit API keys** to version control
+- Use environment variables for sensitive data
+- The `.env` file is automatically ignored by git
+- Consider using a secrets management service for production
+- Rotate API keys regularly
+- Monitor API usage for unexpected activity
 
 ## 📄 License
 
