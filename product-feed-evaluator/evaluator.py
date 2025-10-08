@@ -28,7 +28,7 @@ class ProductFeedEvaluator:
         self.question_cache = {}  # Cache for question reuse by product type
     
     def generate_questions(self, product_context: str, product_type: str, brand: str, 
-                          num_questions: int = 12) -> List[str]:
+                         num_questions: int = 12) -> List[str]:
         """
         Generate buyer questions for a product.
         
@@ -161,7 +161,7 @@ class ProductFeedEvaluator:
         }
     
     def evaluate_product(self, product_data: Dict[str, Any], selected_fields: List[str], 
-                        num_questions: int = 12) -> Dict[str, Any]:
+                       num_questions: int = 12) -> Dict[str, Any]:
         """
         Complete evaluation for a single product.
         
@@ -213,7 +213,8 @@ class ProductFeedEvaluator:
         }
     
     def evaluate_products_batch(self, products_df: pd.DataFrame, selected_fields: List[str],
-                               num_questions: int = 12, batch_size: int = 20) -> pd.DataFrame:
+                              num_questions: int = 12, batch_size: int = 20,
+                              on_progress: Optional[Any] = None, debug: bool = False) -> pd.DataFrame:
         """
         Evaluate a batch of products with rate limiting.
         
@@ -231,20 +232,31 @@ class ProductFeedEvaluator:
         
         for i in range(0, total_products, batch_size):
             batch = products_df.iloc[i:i + batch_size]
-            print(f"Processing batch {i//batch_size + 1}/{(total_products-1)//batch_size + 1}")
+            if debug:
+                print(f"Processing batch {i//batch_size + 1}/{(total_products-1)//batch_size + 1}")
             
+            processed_in_loop = 0
             for _, product in batch.iterrows():
                 try:
                     result = self.evaluate_product(
                         product.to_dict(), selected_fields, num_questions
                     )
                     results.append(result)
+                    processed_in_loop += 1
+                    if on_progress is not None:
+                        on_progress({
+                            "processed": min(i + processed_in_loop, total_products),
+                            "total": total_products,
+                            "current_product_url": result.get("product_url", ""),
+                            "message": f"Processed: {result.get('product_url', '')}"
+                        })
                     
                     # Rate limiting - small delay between API calls
                     time.sleep(0.1)
                     
                 except Exception as e:
-                    print(f"Error evaluating product {product.get('link', 'unknown')}: {e}")
+                    if debug:
+                        print(f"Error evaluating product {product.get('link', 'unknown')}: {e}")
                     # Add error result
                     results.append({
                         'product_url': product.get('link', ''),
@@ -257,6 +269,14 @@ class ProductFeedEvaluator:
                         'no_count': 0,
                         'coverage_pct': 0.0
                     })
+                    processed_in_loop += 1
+                    if on_progress is not None:
+                        on_progress({
+                            "processed": min(i + processed_in_loop, total_products),
+                            "total": total_products,
+                            "current_product_url": product.get('link', ''),
+                            "message": f"Error on: {product.get('link', '')} -> {e}"
+                        })
             
             # Longer delay between batches
             if i + batch_size < total_products:
