@@ -15,8 +15,9 @@ class FeedParser:
     def __init__(self):
         self.required_fields = ['link', 'title', 'description', 'image_link']
         self.recommended_fields = [
-            'brand', 'gtin', 'mpn', 'price', 'availability', 
-            'color', 'size', 'material', 'product_type', 'item_group_id'
+            'brand', 'gtin', 'mpn', 'price', 'availability',
+            'google_product_category', 'condition', 'color', 'size', 'material',
+            'product_type', 'item_group_id'
         ]
     
     def parse_xml_feed(self, xml_content: str) -> List[Dict[str, Any]]:
@@ -47,33 +48,84 @@ class FeedParser:
             raise ValueError(f"Invalid XML format: {e}")
     
     def _extract_product_data(self, item: ET.Element) -> Dict[str, Any]:
-        """Extract product data from a single item element."""
-        product = {}
-        
-        # Map common field names
-        field_mapping = {
-            'id': 'id',
-            'title': 'title',
-            'description': 'description',
-            'link': 'link',
-            'image_link': 'image_link',
-            'brand': 'brand',
-            'gtin': 'gtin',
-            'mpn': 'mpn',
-            'price': 'price',
-            'availability': 'availability',
-            'color': 'color',
-            'size': 'size',
-            'material': 'material',
-            'product_type': 'product_type',
-            'item_group_id': 'item_group_id'
-        }
-        
-        for xml_field, our_field in field_mapping.items():
-            element = item.find(xml_field)
-            if element is not None and element.text:
-                product[our_field] = element.text.strip()
-        
+        """Extract product data from a single item element.
+
+        This parser is namespace-aware and will match tags by local-name,
+        so it supports namespaced Google Merchant tags like <g:image_link>.
+        """
+        product: Dict[str, Any] = {}
+
+        # Helper to get local name (strip namespace/prefix)
+        def local_name(tag: str) -> str:
+            if '}' in tag:
+                return tag.split('}', 1)[1]
+            # Handle potential prefix form like 'g:image_link' (rare in ElementTree)
+            if ':' in tag:
+                return tag.split(':', 1)[1]
+            return tag
+
+        # Collect direct children by local-name (allow multiple occurrences)
+        values_by_local: Dict[str, List[str]] = {}
+        for child in list(item):
+            name = local_name(child.tag)
+            text = (child.text or '').strip()
+            if not text:
+                # For structured nodes like <shipping> with nested fields, flatten child texts
+                nested_texts = []
+                for grand in list(child):
+                    gtext = (grand.text or '').strip()
+                    if gtext:
+                        nested_texts.append(gtext)
+                if nested_texts:
+                    text = ' | '.join(nested_texts)
+            if text:
+                values_by_local.setdefault(name, []).append(text)
+
+        # Full set of common Google Merchant attributes we support
+        merchant_fields = [
+            # Identifiers and links
+            'id', 'title', 'description', 'link', 'mobile_link',
+            # Media
+            'image_link', 'additional_image_link',
+            # Availability and condition
+            'availability', 'availability_date', 'expiration_date', 'condition',
+            # Pricing
+            'price', 'sale_price', 'sale_price_effective_date', 'cost_of_goods_sold',
+            # Brand and product identifiers
+            'brand', 'gtin', 'mpn', 'identifier_exists', 'item_group_id',
+            # Taxonomy and type
+            'google_product_category', 'product_type',
+            # Variants and attributes
+            'color', 'size', 'size_type', 'size_system', 'material', 'pattern',
+            'age_group', 'gender', 'adult', 'multipack', 'is_bundle',
+            # Energy labels
+            'energy_efficiency_class', 'min_energy_efficiency_class', 'max_energy_efficiency_class',
+            # Unit pricing
+            'unit_pricing_measure', 'unit_pricing_base_measure',
+            # Shipping and tax
+            'shipping', 'shipping_weight', 'shipping_length', 'shipping_width', 'shipping_height', 'shipping_label', 'tax',
+            # Campaign labels and destinations
+            'custom_label_0', 'custom_label_1', 'custom_label_2', 'custom_label_3', 'custom_label_4',
+            'included_destination', 'excluded_destination', 'shopping_ads_excluded_country',
+            # Programs
+            'loyalty_points', 'installment', 'subscription_cost'
+        ]
+
+        # Map collected values into product dict, joining multiples
+        for field in merchant_fields:
+            if field in values_by_local:
+                vals = values_by_local[field]
+                product[field] = ' | '.join(v for v in vals if v)
+
+        # Ensure we also handle cases where some feeds provide non-namespaced tags
+        # Try a small set of key fields via ElementTree find as a fallback
+        fallback_keys = ['id', 'title', 'description', 'link']
+        for key in fallback_keys:
+            if key not in product:
+                el = item.find(key)
+                if el is not None and el.text:
+                    product[key] = el.text.strip()
+
         return product
     
     def clean_text(self, text: str) -> str:

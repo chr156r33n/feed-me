@@ -77,10 +77,32 @@ def main():
         st.subheader("📋 Field Selection")
         st.markdown("Select which fields to include in product context:")
         
-        default_fields = ['title', 'description', 'brand', 'price', 'color', 'size', 'material', 'availability']
+        default_fields = ['title', 'description', 'brand', 'price', 'availability', 'image_link']
         available_fields = [
-            'title', 'description', 'brand', 'price', 'color', 'size', 'material', 
-            'availability', 'product_type', 'gtin', 'mpn', 'item_group_id'
+            # Identifiers and links
+            'id', 'title', 'description', 'link', 'mobile_link',
+            # Media
+            'image_link', 'additional_image_link',
+            # Availability and condition
+            'availability', 'availability_date', 'expiration_date', 'condition',
+            # Pricing
+            'price', 'sale_price', 'sale_price_effective_date', 'cost_of_goods_sold',
+            # Brand and product identifiers
+            'brand', 'gtin', 'mpn', 'identifier_exists', 'item_group_id',
+            # Taxonomy and type
+            'google_product_category', 'product_type',
+            # Variants and attributes
+            'color', 'size', 'size_type', 'size_system', 'material', 'pattern', 'age_group', 'gender', 'adult', 'multipack', 'is_bundle',
+            # Energy labels
+            'energy_efficiency_class', 'min_energy_efficiency_class', 'max_energy_efficiency_class',
+            # Unit pricing
+            'unit_pricing_measure', 'unit_pricing_base_measure',
+            # Shipping and tax
+            'shipping', 'shipping_weight', 'shipping_length', 'shipping_width', 'shipping_height', 'shipping_label', 'tax',
+            # Campaign labels and destinations
+            'custom_label_0', 'custom_label_1', 'custom_label_2', 'custom_label_3', 'custom_label_4', 'included_destination', 'excluded_destination', 'shopping_ads_excluded_country',
+            # Programs
+            'loyalty_points', 'installment', 'subscription_cost'
         ]
         
         selected_fields = st.multiselect(
