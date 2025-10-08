@@ -44,8 +44,7 @@ def main():
         )
         
         if not api_key:
-            st.error("Please enter your OpenAI API key to continue.")
-            return
+            st.info("Optional: Enter your OpenAI API key to enable AI evaluation. You can still configure and load feeds without it.")
         
         # Model selection
         model = st.selectbox(
@@ -194,7 +193,8 @@ def main():
     
     # Process button
     if xml_content and selected_fields:
-        if st.button("🚀 Start Evaluation", disabled=st.session_state.processing):
+        start_button_disabled = st.session_state.processing or not api_key
+        if st.button("🚀 Start Evaluation", disabled=start_button_disabled):
             st.session_state.processing = True
             
             try:
