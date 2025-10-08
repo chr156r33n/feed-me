@@ -1,358 +1,336 @@
 """
-Main Streamlit application for the Product Feed Evaluation Agent.
+Drop-in replacement for evaluator.py
+- Honors Streamlit-selected fields when building prompts
+- Adds locale support
+- Implements question generation -> QA -> judgement pipeline
+- Computes weighted coverage and returns a pandas DataFrame
+
+Requires: prompt.py (v2) in the same project providing:
+  QUESTION_GENERATION_PROMPT, QUESTION_QA_PROMPT, ANSWER_JUDGEMENT_PROMPT
+
+App entrypoint expects:
+  ProductFeedEvaluator(api_key, model, locale)
+  .evaluate_products_batch(products_df, selected_fields, num_questions, batch_size, on_progress, debug)
 """
+from __future__ import annotations
 
-import streamlit as st
+import json
+import math
+import re
+import html
+import time
+from typing import Any, Dict, List, Tuple, Callable, Optional
+
 import pandas as pd
-import os
-from datetime import datetime
-import requests
-from feed_parser import FeedParser
-from evaluator import ProductFeedEvaluator
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Page configuration
-st.set_page_config(
-    page_title="Product Feed Evaluator",
-    page_icon="🧠",
-    layout="wide"
+from prompt import (
+    QUESTION_GENERATION_PROMPT,
+    QUESTION_QA_PROMPT,
+    ANSWER_JUDGEMENT_PROMPT,
 )
 
-# Initialize session state
-if 'results' not in st.session_state:
-    st.session_state.results = None
-if 'processing' not in st.session_state:
-    st.session_state.processing = False
+try:
+    # New-style OpenAI SDK
+    from openai import OpenAI
+except Exception:  # pragma: no cover
+    OpenAI = None  # type: ignore
 
-def main():
-    st.title("🧠 Product Feed Evaluation Agent")
-    st.markdown("Evaluate Google Shopping product feed quality by checking how well each product answers buyer questions.")
-    
-    # Sidebar for configuration
-    with st.sidebar:
-        st.header("⚙️ Configuration")
-        
-        # API Key input
-        api_key = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            value=os.getenv("OPENAI_API_KEY", ""),
-            help="Enter your OpenAI API key. You can also set it in your environment variables."
-        )
-        
-        if not api_key:
-            st.info("Optional: Enter your OpenAI API key to enable AI evaluation. You can still configure and load feeds without it.")
-        
-        # Model selection
-        model = st.selectbox(
-            "GPT Model",
-            ["gpt-4o-mini", "gpt-4-turbo", "gpt-4"],
-            index=0,
-            help="gpt-4o-mini is faster and cheaper, gpt-4-turbo is more accurate"
-        )
-        
-        # Number of questions
-        num_questions = st.slider(
-            "Questions per Product",
-            min_value=5,
-            max_value=20,
-            value=12,
-            help="Number of buyer questions to generate per product"
-        )
-        
-        # Batch size
-        batch_size = st.slider(
-            "Batch Size",
-            min_value=5,
-            max_value=50,
-            value=20,
-            help="Number of products to process in each batch"
-        )
-        
-        # Debug mode toggle
-        debug_mode = st.checkbox(
-            "Enable Debug Mode",
-            value=False,
-            help="Show verbose logs and detailed progress while running"
-        )
-        
-        # Field selection
-        st.subheader("📋 Field Selection")
-        st.markdown("Select which fields to include in product context:")
-        
-        default_fields = ['title', 'description', 'brand', 'price', 'availability', 'image_link']
-        available_fields = [
-            # Identifiers and links
-            'id', 'title', 'description', 'link', 'mobile_link',
-            # Media
-            'image_link', 'additional_image_link',
-            # Availability and condition
-            'availability', 'availability_date', 'expiration_date', 'condition',
-            # Pricing
-            'price', 'sale_price', 'sale_price_effective_date', 'cost_of_goods_sold',
-            # Brand and product identifiers
-            'brand', 'gtin', 'mpn', 'identifier_exists', 'item_group_id',
-            # Taxonomy and type
-            'google_product_category', 'product_type',
-            # Variants and attributes
-            'color', 'size', 'size_type', 'size_system', 'material', 'pattern', 'age_group', 'gender', 'adult', 'multipack', 'is_bundle',
-            # Energy labels
-            'energy_efficiency_class', 'min_energy_efficiency_class', 'max_energy_efficiency_class',
-            # Unit pricing
-            'unit_pricing_measure', 'unit_pricing_base_measure',
-            # Shipping and tax
-            'shipping', 'shipping_weight', 'shipping_length', 'shipping_width', 'shipping_height', 'shipping_label', 'tax',
-            # Campaign labels and destinations
-            'custom_label_0', 'custom_label_1', 'custom_label_2', 'custom_label_3', 'custom_label_4', 'included_destination', 'excluded_destination', 'shopping_ads_excluded_country',
-            # Programs
-            'loyalty_points', 'installment', 'subscription_cost'
-        ]
-        
-        selected_fields = st.multiselect(
-            "Fields to include",
-            available_fields,
-            default=default_fields,
-            help="The 'link' field is always included automatically"
-        )
-        
-        if 'link' not in selected_fields:
-            selected_fields.append('link')
-    
-    # Main content area
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.header("📥 Input Feed")
-        
-        # Feed input method
-        input_method = st.radio(
-            "Choose input method:",
-            ["Upload XML file", "Paste XML content", "Enter feed URL"]
-        )
-        
-        xml_content = None
-        
-        if input_method == "Upload XML file":
-            uploaded_file = st.file_uploader(
-                "Upload your Google Shopping XML feed",
-                type=['xml'],
-                help="Upload a valid Google Shopping XML feed file"
-            )
-            if uploaded_file:
-                xml_content = uploaded_file.read().decode('utf-8')
-        
-        elif input_method == "Paste XML content":
-            xml_content = st.text_area(
-                "Paste your XML feed content",
-                height=200,
-                help="Paste the raw XML content of your feed"
-            )
-        
-        elif input_method == "Enter feed URL":
-            feed_url = st.text_input(
-                "Enter feed URL",
-                placeholder="https://example.com/feed.xml",
-                help="Enter the public URL of your XML feed"
-            )
-            if feed_url:
+
+# -------------------------
+# Formatting helpers
+# -------------------------
+FIELD_LABELS = {
+    "id": "ID",
+    "title": "Title",
+    "description": "Description",
+    "link": "URL",
+    "mobile_link": "Mobile URL",
+    "image_link": "Image",
+    "availability": "Availability",
+    "availability_date": "Available From",
+    "expiration_date": "Expires",
+    "condition": "Condition",
+    "price": "Price",
+    "sale_price": "Sale Price",
+    "sale_price_effective_date": "Sale Window",
+    "brand": "Brand",
+    "gtin": "GTIN",
+    "mpn": "MPN",
+    "identifier_exists": "Identifier Exists",
+    "item_group_id": "Group",
+    "google_product_category": "GPC",
+    "product_type": "Type",
+    "color": "Color",
+    "size": "Size",
+    "size_type": "Size Type",
+    "size_system": "Size System",
+    "material": "Material",
+    "pattern": "Pattern",
+    "age_group": "Age Group",
+    "gender": "Gender",
+    "adult": "Adult",
+    "multipack": "Multipack",
+    "is_bundle": "Bundle",
+    "unit_pricing_measure": "Unit Measure",
+    "unit_pricing_base_measure": "Unit Base",
+    "shipping": "Shipping",
+    "shipping_weight": "Ship Wt",
+    "shipping_length": "Ship L",
+    "shipping_width": "Ship W",
+    "shipping_height": "Ship H",
+    "shipping_label": "Ship Label",
+    "tax": "Tax",
+    "custom_label_0": "Custom 0",
+    "custom_label_1": "Custom 1",
+    "custom_label_2": "Custom 2",
+    "custom_label_3": "Custom 3",
+    "custom_label_4": "Custom 4",
+    "included_destination": "Included Dest",
+    "excluded_destination": "Excluded Dest",
+    "shopping_ads_excluded_country": "Excluded Country",
+    "loyalty_points": "Loyalty",
+    "installment": "Installment",
+    "subscription_cost": "Subscription",
+}
+
+PREFERRED_ORDER = [
+    "title",
+    "brand",
+    "product_type",
+    "google_product_category",
+    "price",
+    "availability",
+    "color",
+    "size",
+    "material",
+    "gtin",
+    "mpn",
+]
+
+RE_JSON_PREFIX = re.compile(r"^[\s\S]*?(\[|\{)\s*")
+
+
+def _clean_text(val: Any) -> str:
+    if val is None:
+        return ""
+    s = html.unescape(str(val))
+    s = re.sub(r"<[^>]+>", " ", s)  # strip tags
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def build_context(product: Dict[str, Any], selected_fields: List[str]) -> Tuple[str, str]:
+    """Return (short_context_text, name_plus_context) built ONLY from selected_fields + link."""
+    fields = list(dict.fromkeys(selected_fields + ["link"]))  # ensure link present, preserve order
+    parts: List[str] = []
+    for f in fields:
+        v = _clean_text(product.get(f, ""))
+        if not v:
+            continue
+        label = FIELD_LABELS.get(f, f.replace("_", " ").title())
+        parts.append(f"{label}: {v}")
+
+    name_plus_context = " | ".join(parts)
+
+    preferred_labels = {FIELD_LABELS.get(k, k.replace('_',' ').title()) for k in PREFERRED_ORDER}
+    preferred = [p for p in parts if p.split(":")[0] in preferred_labels]
+    others = [p for p in parts if p not in preferred]
+    short = " | ".join(preferred + others)
+    if len(short) > 2000:
+        short = short[:2000] + "…"
+    return short, name_plus_context
+
+
+# -------------------------
+# Scoring
+# -------------------------
+REQUIRED_WEIGHT = 2.0
+OPTIONAL_WEIGHT = 1.0
+
+
+def _verdict_score(v: str) -> float:
+    if v == "yes":
+        return 1.0
+    if v == "partial":
+        return 0.5
+    return 0.0
+
+
+def compute_weighted_coverage(items: List[Dict[str, Any]]) -> Tuple[float, int, int, int]:
+    yes = partial = no = 0
+    total_weight = 0.0
+    achieved = 0.0
+    for it in items:
+        v = str(it.get("verdict", "no")).lower()
+        req = bool(it.get("required", False))
+        w = REQUIRED_WEIGHT if req else OPTIONAL_WEIGHT
+        total_weight += w
+        s = _verdict_score(v)
+        achieved += s * w
+        if v == "yes":
+            yes += 1
+        elif v == "partial":
+            partial += 1
+        else:
+            no += 1
+    pct = 0.0 if total_weight == 0 else (achieved / total_weight) * 100.0
+    return pct, yes, partial, no
+
+
+# -------------------------
+# OpenAI client wrapper
+# -------------------------
+class _LLM:
+    def __init__(self, api_key: str, model: str):
+        if OpenAI is None:
+            raise RuntimeError("OpenAI SDK not available. Install openai>=1.0.0.")
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+
+    def json_completion(self, prompt: str, max_retries: int = 2) -> Any:
+        last_err: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.model,
+                    temperature=0,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = resp.choices[0].message.content or ""
+                # try to isolate JSON if the model chatters
+                text = text.strip()
                 try:
-                    response = requests.get(feed_url, timeout=30)
-                    response.raise_for_status()
-                    xml_content = response.text
-                    st.success("Feed loaded successfully!")
-                except Exception as e:
-                    st.error(f"Error loading feed: {e}")
-    
-    with col2:
-        st.header("📊 Quick Stats")
-        
-        if xml_content:
-            try:
-                parser = FeedParser()
-                products = parser.parse_xml_feed(xml_content)
-                
-                st.metric("Total Products", len(products))
-                
-                # Show field coverage
-                field_coverage = {}
-                # Reflect selected fields in Quick Stats (exclude 'link')
-                stats_fields = [f for f in selected_fields if f != 'link'] if 'selected_fields' in locals() else []
-                if not stats_fields:
-                    stats_fields = ['title', 'description', 'brand', 'price', 'availability']
-                max_stats = 10
-                display_fields = stats_fields[:max_stats]
-                for field in display_fields:
-                    count = sum(1 for p in products if p.get(field))
-                    coverage = round(count / len(products) * 100, 1) if products else 0
-                    field_coverage[field] = coverage
-                
-                st.subheader("Field Coverage")
-                for field, coverage in field_coverage.items():
-                    st.metric(field.replace('_', ' ').title(), f"{coverage}%")
-                if len(stats_fields) > max_stats:
-                    st.caption(f"Showing first {max_stats} of {len(stats_fields)} selected fields")
-                
-            except Exception as e:
-                st.error(f"Error parsing feed: {e}")
-    
-    # Process button
-    if xml_content and selected_fields:
-        start_button_disabled = st.session_state.processing or not api_key
-        if st.button("🚀 Start Evaluation", disabled=start_button_disabled):
-            st.session_state.processing = True
-            
-            try:
-                # Initialize components
-                parser = FeedParser()
-                evaluator = ProductFeedEvaluator(api_key, model)
-                
-                # Process feed
-                with st.spinner("Processing feed..."):
-                    products_df = parser.process_feed(xml_content, selected_fields)
-                
-                st.success(f"Feed processed: {len(products_df)} products found")
-                
-                # Evaluate products
-                with st.spinner("Evaluating products with AI..."):
-                    total_products = len(products_df)
-                    progress_bar = st.progress(0, text="Starting evaluation...")
-                    status_text = st.empty()
-                    debug_log_placeholder = None
-                    if debug_mode:
-                        st.session_state["debug_lines"] = []
-                        debug_expander = st.expander("🪲 Debug Logs", expanded=False)
-                        debug_log_placeholder = debug_expander.empty()
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    # Best-effort extraction of first JSON array/object
+                    start = min((i for i in [text.find("[{"), text.find("[\n{"), text.find("[") if i != -1]), default=-1)
+                    if start != -1:
+                        snippet = text[start:]
+                        # balance brackets roughly
+                        # fallback: strip trailing code fences
+                        snippet = snippet.strip().strip("`")
+                        return json.loads(snippet)
+                    raise
+            except Exception as e:  # pragma: no cover
+                last_err = e
+                time.sleep(0.6 * (attempt + 1))
+        raise last_err  # type: ignore
 
-                    def on_progress_update(state):
-                        processed = state.get("processed", 0)
-                        total = state.get("total", total_products)
-                        current_url = state.get("current_product_url", "")
-                        pct = int(processed / total * 100) if total > 0 else 0
-                        progress_bar.progress(pct, text=f"Evaluating products... {processed}/{total}")
-                        if current_url:
-                            status_text.write(f"Current: {current_url}")
-                        if debug_mode and debug_log_placeholder is not None:
-                            message = state.get("message", "")
-                            if message:
-                                st.session_state["debug_lines"].append(message)
-                                debug_log_placeholder.code("\n".join(st.session_state["debug_lines"]))
 
-                    results_df = evaluator.evaluate_products_batch(
-                        products_df,
-                        selected_fields,
-                        num_questions,
-                        batch_size,
-                        on_progress=on_progress_update,
-                        debug=debug_mode
-                    )
-                
-                # Save results
-                timestamp = datetime.now().strftime("%Y%m%d")
-                output_dir = "output"
-                os.makedirs(output_dir, exist_ok=True)
-                output_file = f"{output_dir}/feed_analysis_{timestamp}.csv"
-                results_df.to_csv(output_file, index=False)
-                
-                st.session_state.results = results_df
-                st.success(f"Evaluation complete! Results saved to {output_file}")
-                
-            except Exception as e:
-                st.error(f"Error during evaluation: {e}")
+# -------------------------
+# Evaluator
+# -------------------------
+class ProductFeedEvaluator:
+    def __init__(self, api_key: str, model: str, locale: str = "en-GB"):
+        self.locale = locale
+        self.llm = _LLM(api_key=api_key, model=model)
+
+    # ---- internal steps
+    def _gen_questions(self, product: Dict[str, Any], selected_fields: List[str], n: int) -> List[Dict[str, Any]]:
+        short_ctx, _ = build_context(product, selected_fields)
+        prompt = QUESTION_GENERATION_PROMPT.format(
+            N=n,
+            locale=self.locale,
+            title=_clean_text(product.get("title", "")),
+            brand=_clean_text(product.get("brand", "")),
+            product_type=_clean_text(product.get("product_type", "")) or _clean_text(product.get("google_product_category", "")),
+            short_context_text=short_ctx,
+        )
+        data = self.llm.json_completion(prompt)
+        if isinstance(data, list):
+            return data
+        return []
+
+    def _qa_questions(self, product: Dict[str, Any], selected_fields: List[str], n: int, candidate_questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        short_ctx, _ = build_context(product, selected_fields)
+        prompt = QUESTION_QA_PROMPT.format(
+            N=n,
+            locale=self.locale,
+            title=_clean_text(product.get("title", "")),
+            brand=_clean_text(product.get("brand", "")),
+            product_type=_clean_text(product.get("product_type", "")) or _clean_text(product.get("google_product_category", "")),
+            short_context_text=short_ctx,
+            candidate_questions_json=json.dumps(candidate_questions, ensure_ascii=False),
+        )
+        data = self.llm.json_completion(prompt)
+        if isinstance(data, list):
+            return data
+        return []
+
+    def _judge_answers(self, product: Dict[str, Any], selected_fields: List[str], final_questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        _, full_ctx = build_context(product, selected_fields)
+        prompt = ANSWER_JUDGEMENT_PROMPT.format(
+            name_plus_context=full_ctx,
+            final_questions_json=json.dumps(final_questions, ensure_ascii=False),
+        )
+        data = self.llm.json_completion(prompt)
+        if isinstance(data, list):
+            return data
+        return []
+
+    # ---- public API
+    def evaluate_products_batch(
+        self,
+        products_df: pd.DataFrame,
+        selected_fields: List[str],
+        num_questions: int,
+        batch_size: int,
+        on_progress: Optional[Callable[[Dict[str, Any]], None]] = None,
+        debug: bool = False,
+    ) -> pd.DataFrame:
+        rows: List[Dict[str, Any]] = []
+        total = len(products_df)
+
+        def progress(i: int, url: str = "", msg: str = ""):
+            if on_progress:
+                on_progress({"processed": i, "total": total, "current_product_url": url, "message": msg})
+
+        for i, (_, prod) in enumerate(products_df.iterrows(), start=1):
+            product: Dict[str, Any] = prod.to_dict()
+            product_url = _clean_text(product.get("link", ""))
+            try:
+                # Step 1: candidates
+                candidates = self._gen_questions(product, selected_fields, num_questions)
+                # Step 2: QA/refine
+                final_qs = self._qa_questions(product, selected_fields, num_questions, candidates)
+                # Step 3: judge
+                judgements = self._judge_answers(product, selected_fields, final_qs)
+
+                # Scoring
+                coverage_pct, yes_c, partial_c, no_c = compute_weighted_coverage(judgements)
+                unanswered_required = sum(1 for j in judgements if j.get("required") and j.get("verdict") in {"no", "partial"})
+
+                # Build contexts for output
+                short_ctx, name_plus_context = build_context(product, selected_fields)
+
+                row = {
+                    "product_url": product_url,
+                    "name_plus_context": name_plus_context,
+                    "questions_json": json.dumps([{"question": q.get("question"), "taxonomy": q.get("taxonomy"), "required": bool(q.get("required", False))} for q in final_qs], ensure_ascii=False),
+                    "judgements_json": json.dumps(judgements, ensure_ascii=False),
+                    "yes_count": yes_c,
+                    "partial_count": partial_c,
+                    "no_count": no_c,
+                    "coverage_pct": round(coverage_pct, 1),
+                    "unanswered_required_count": unanswered_required,
+                    "context_fields": ",".join(selected_fields),
+                }
+                rows.append(row)
+            except Exception as e:  # keep pipeline resilient
+                if debug:
+                    rows.append({
+                        "product_url": product_url,
+                        "name_plus_context": "",
+                        "questions_json": "[]",
+                        "judgements_json": json.dumps([{"error": str(e)}]),
+                        "yes_count": 0,
+                        "partial_count": 0,
+                        "no_count": 0,
+                        "coverage_pct": 0.0,
+                        "unanswered_required_count": 0,
+                        "context_fields": ",".join(selected_fields),
+                    })
             finally:
-                st.session_state.processing = False
-    
-    # Display results
-    if st.session_state.results is not None:
-        st.header("📈 Evaluation Results")
-        
-        results_df = st.session_state.results
-        
-        # Summary metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            avg_coverage = results_df['coverage_pct'].mean()
-            st.metric("Average Coverage", f"{avg_coverage:.1f}%")
-        
-        with col2:
-            high_coverage = len(results_df[results_df['coverage_pct'] >= 70])
-            st.metric("High Coverage (≥70%)", high_coverage)
-        
-        with col3:
-            low_coverage = len(results_df[results_df['coverage_pct'] < 30])
-            st.metric("Low Coverage (<30%)", low_coverage)
-        
-        with col4:
-            total_products = len(results_df)
-            st.metric("Total Products", total_products)
-        
-        # Results table
-        st.subheader("📋 Detailed Results")
-        
-        # Filter options
-        col1, col2 = st.columns(2)
-        with col1:
-            min_coverage = st.slider("Minimum Coverage %", 0, 100, 0)
-        with col2:
-            sort_by = st.selectbox("Sort by", ["coverage_pct", "product_url", "yes_count"])
-        
-        # Filter and sort results
-        filtered_results = results_df[results_df['coverage_pct'] >= min_coverage]
-        filtered_results = filtered_results.sort_values(sort_by, ascending=False)
-        
-        # Display table
-        st.dataframe(
-            filtered_results,
-            use_container_width=True,
-            column_config={
-                "product_url": st.column_config.LinkColumn("Product URL"),
-                "coverage_pct": st.column_config.NumberColumn("Coverage %", format="%.1f%%"),
-                "yes_count": "Yes",
-                "partial_count": "Partial", 
-                "no_count": "No"
-            }
-        )
-        
-        # Download button
-        csv_data = results_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Results CSV",
-            data=csv_data,
-            file_name=f"feed_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
-        
-        # Analysis insights
-        st.subheader("🔍 Analysis Insights")
-        
-        # Coverage distribution
-        coverage_ranges = [
-            (0, 30, "Poor"),
-            (30, 50, "Fair"), 
-            (50, 70, "Good"),
-            (70, 100, "Excellent")
-        ]
-        
-        for min_val, max_val, label in coverage_ranges:
-            count = len(results_df[
-                (results_df['coverage_pct'] >= min_val) & 
-                (results_df['coverage_pct'] < max_val)
-            ])
-            percentage = count / len(results_df) * 100 if len(results_df) > 0 else 0
-            st.metric(f"{label} Coverage", f"{count} products ({percentage:.1f}%)")
-        
-        # Most common missing fields
-        if 'missing_core_fields' in results_df.columns:
-            missing_fields = results_df['missing_core_fields'].str.split(', ').explode()
-            missing_counts = missing_fields.value_counts()
-            if not missing_counts.empty:
-                st.subheader("🚨 Most Common Missing Fields")
-                for field, count in missing_counts.head().items():
-                    if field:  # Skip empty strings
-                        st.write(f"• {field}: {count} products")
+                progress(i, product_url)
 
-if __name__ == "__main__":
-    main()
+        return pd.DataFrame(rows)
