@@ -40,19 +40,8 @@ You can also enter your API key directly in the Streamlit interface.
 
 ### 3. Run the Application
 
-**Option 1: Web Interface (Recommended)**
 ```bash
 streamlit run app.py
-```
-
-**Option 2: Command Line Interface**
-```bash
-python cli.py sample_feed.xml
-```
-
-For CLI options:
-```bash
-python cli.py --help
 ```
 
 ## 📋 Usage
@@ -125,20 +114,30 @@ The tool automatically flags:
 ```
 product-feed-evaluator/
 ├── app.py                   # Streamlit web application
-├── cli.py                   # Command-line interface
+├── test_app.py              # Test script
 ├── prompts.py               # GPT prompt templates
 ├── feed_parser.py           # XML parsing and data cleaning
 ├── evaluator.py             # GPT interaction and scoring
 ├── requirements.txt         # Python dependencies
 ├── sample_feed.xml          # Example XML feed for testing
+├── DEPLOYMENT.md            # Deployment instructions
 ├── .env                     # Environment variables (create this - not in git)
 ├── .gitignore               # Git ignore file
+├── .streamlit/              # Streamlit configuration
+│   └── config.toml
 └── output/                  # Generated CSV files
     └── feed_analysis_YYYYMMDD.csv
 ```
 
 ## 🧪 Testing
 
+### Quick Test
+Run the test script to verify everything is working:
+```bash
+python test_app.py
+```
+
+### Sample Data
 Use the included `sample_feed.xml` to test the tool with sample product data.
 
 ## 🔧 Troubleshooting
@@ -181,6 +180,10 @@ This tool is designed to be simple, explainable, and fast. Feel free to extend i
 - Consider using a secrets management service for production
 - Rotate API keys regularly
 - Monitor API usage for unexpected activity
+
+## 🚀 Deployment
+
+For deploying to Streamlit Cloud, see [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
 ## 📄 License
 
