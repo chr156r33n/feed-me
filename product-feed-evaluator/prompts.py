@@ -36,7 +36,7 @@ Rules:
 
 Return ONLY a JSON array of objects with this schema:
 [
-  { "question": string, "taxonomy": string }
+  {{ "question": string, "taxonomy": string }}
 ]
 
 CONTEXT:
@@ -53,7 +53,7 @@ QUESTION_QA_PROMPT = """System: You are a ruthless editor. You normalize, dedupe
 User:
 You are given:
 A) product summary (below)
-B) candidate questions (JSON array of {question, taxonomy})
+B) candidate questions (JSON array of {{question, taxonomy}})
 C) max_n = {N}
 
 Tasks:
@@ -67,7 +67,7 @@ Tasks:
 
 Return ONLY a JSON array with this schema:
 [
-  { "question": string, "taxonomy": string, "required": boolean }
+  {{ "question": string, "taxonomy": string, "required": boolean }}
 ]
 
 CONTEXT:
@@ -86,13 +86,13 @@ ANSWER_JUDGEMENT_PROMPT = """System: You strictly judge if the SUMMARY answers e
 
 User:
 For each question, output an object:
-{
+{{
   "question": str,
   "taxonomy": str,
   "required": boolean,
   "verdict": "yes"|"partial"|"no",
   "reason": str  // <= 16 words; if verdict is "yes", quote the exact supporting phrase
-}
+}}
 
 Verdict rules:
 - "yes": explicit, unambiguous answer with units/specs if applicable (quote brief phrase).
