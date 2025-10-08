@@ -1,0 +1,4 @@
+# Ignore output directory to prevent file watcher triggers
+output/
+*.json
+*.log

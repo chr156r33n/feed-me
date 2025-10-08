@@ -224,10 +224,11 @@ def main():
                 
                 # Show output directory info
                 output_dir = "output"
-                if os.path.exists(output_dir):
-                    batch_files = [f for f in os.listdir(output_dir) if f.startswith("batch_") and f.endswith(".json")]
+                batches_dir = os.path.join(output_dir, "batches")
+                if os.path.exists(batches_dir):
+                    batch_files = [f for f in os.listdir(batches_dir) if f.startswith("batch_") and f.endswith(".json")]
                     if batch_files:
-                        st.info(f"📁 Saved {len(batch_files)} batch files in '{output_dir}' directory")
+                        st.info(f"📁 Saved {len(batch_files)} batch files in '{batches_dir}' directory")
                         st.caption("Batch files are automatically saved to prevent data loss on large runs")
                         
                         # Cleanup option

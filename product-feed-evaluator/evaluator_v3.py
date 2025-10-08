@@ -228,8 +228,9 @@ class BatchSaver:
     """Handles saving and loading batch results to/from disk."""
     
     def __init__(self, output_dir: str = "output"):
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        # Use a more isolated directory structure to avoid Streamlit file watcher
+        self.output_dir = Path(output_dir) / "batches"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
     def get_batch_file(self, batch_num: int) -> Path:
@@ -414,16 +415,21 @@ class ProductFeedEvaluator:
             if on_progress:
                 on_progress({"processed": i, "total": total, "current_product_url": url, "message": msg})
             
-            # Save progress every 10 products
-            if i % 10 == 0:
-                self.batch_saver.save_progress({
-                    'last_processed': i,
-                    'total': total,
-                    'timestamp': datetime.now().isoformat(),
-                    'batch_size': batch_size,
-                    'selected_fields': selected_fields,
-                    'num_questions': num_questions
-                })
+            # Save progress less frequently to prevent Streamlit file watcher triggers
+            # Only save every 100 products or at the end of batches
+            if i % 100 == 0 or (i % batch_size == 0 and i > 0):
+                try:
+                    self.batch_saver.save_progress({
+                        'last_processed': i,
+                        'total': total,
+                        'timestamp': datetime.now().isoformat(),
+                        'batch_size': batch_size,
+                        'selected_fields': selected_fields,
+                        'num_questions': num_questions
+                    })
+                except Exception as e:
+                    # Don't let progress saving errors interrupt evaluation
+                    logger.warning(f"Failed to save progress: {e}")
 
         # Process products in batches
         current_batch = []
