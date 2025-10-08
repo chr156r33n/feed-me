@@ -172,14 +172,22 @@ def main():
                 
                 # Show field coverage
                 field_coverage = {}
-                for field in ['title', 'description', 'brand', 'price', 'availability']:
+                # Reflect selected fields in Quick Stats (exclude 'link')
+                stats_fields = [f for f in selected_fields if f != 'link'] if 'selected_fields' in locals() else []
+                if not stats_fields:
+                    stats_fields = ['title', 'description', 'brand', 'price', 'availability']
+                max_stats = 10
+                display_fields = stats_fields[:max_stats]
+                for field in display_fields:
                     count = sum(1 for p in products if p.get(field))
                     coverage = round(count / len(products) * 100, 1) if products else 0
                     field_coverage[field] = coverage
                 
                 st.subheader("Field Coverage")
                 for field, coverage in field_coverage.items():
-                    st.metric(field.title(), f"{coverage}%")
+                    st.metric(field.replace('_', ' ').title(), f"{coverage}%")
+                if len(stats_fields) > max_stats:
+                    st.caption(f"Showing first {max_stats} of {len(stats_fields)} selected fields")
                 
             except Exception as e:
                 st.error(f"Error parsing feed: {e}")
