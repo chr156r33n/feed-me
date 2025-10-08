@@ -77,10 +77,32 @@ def main():
         st.subheader("📋 Field Selection")
         st.markdown("Select which fields to include in product context:")
         
-        default_fields = ['title', 'description', 'brand', 'price', 'color', 'size', 'material', 'availability']
+        default_fields = ['title', 'description', 'brand', 'price', 'availability', 'image_link']
         available_fields = [
-            'title', 'description', 'brand', 'price', 'color', 'size', 'material', 
-            'availability', 'product_type', 'gtin', 'mpn', 'item_group_id'
+            # Identifiers and links
+            'id', 'title', 'description', 'link', 'mobile_link',
+            # Media
+            'image_link', 'additional_image_link',
+            # Availability and condition
+            'availability', 'availability_date', 'expiration_date', 'condition',
+            # Pricing
+            'price', 'sale_price', 'sale_price_effective_date', 'cost_of_goods_sold',
+            # Brand and product identifiers
+            'brand', 'gtin', 'mpn', 'identifier_exists', 'item_group_id',
+            # Taxonomy and type
+            'google_product_category', 'product_type',
+            # Variants and attributes
+            'color', 'size', 'size_type', 'size_system', 'material', 'pattern', 'age_group', 'gender', 'adult', 'multipack', 'is_bundle',
+            # Energy labels
+            'energy_efficiency_class', 'min_energy_efficiency_class', 'max_energy_efficiency_class',
+            # Unit pricing
+            'unit_pricing_measure', 'unit_pricing_base_measure',
+            # Shipping and tax
+            'shipping', 'shipping_weight', 'shipping_length', 'shipping_width', 'shipping_height', 'shipping_label', 'tax',
+            # Campaign labels and destinations
+            'custom_label_0', 'custom_label_1', 'custom_label_2', 'custom_label_3', 'custom_label_4', 'included_destination', 'excluded_destination', 'shopping_ads_excluded_country',
+            # Programs
+            'loyalty_points', 'installment', 'subscription_cost'
         ]
         
         selected_fields = st.multiselect(
@@ -150,14 +172,22 @@ def main():
                 
                 # Show field coverage
                 field_coverage = {}
-                for field in ['title', 'description', 'brand', 'price', 'availability']:
+                # Reflect selected fields in Quick Stats (exclude 'link')
+                stats_fields = [f for f in selected_fields if f != 'link'] if 'selected_fields' in locals() else []
+                if not stats_fields:
+                    stats_fields = ['title', 'description', 'brand', 'price', 'availability']
+                max_stats = 10
+                display_fields = stats_fields[:max_stats]
+                for field in display_fields:
                     count = sum(1 for p in products if p.get(field))
                     coverage = round(count / len(products) * 100, 1) if products else 0
                     field_coverage[field] = coverage
                 
                 st.subheader("Field Coverage")
                 for field, coverage in field_coverage.items():
-                    st.metric(field.title(), f"{coverage}%")
+                    st.metric(field.replace('_', ' ').title(), f"{coverage}%")
+                if len(stats_fields) > max_stats:
+                    st.caption(f"Showing first {max_stats} of {len(stats_fields)} selected fields")
                 
             except Exception as e:
                 st.error(f"Error parsing feed: {e}")
