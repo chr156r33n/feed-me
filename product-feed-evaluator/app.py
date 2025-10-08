@@ -3,6 +3,7 @@ import io
 import json
 import pandas as pd
 import streamlit as st
+import time
 from dotenv import load_dotenv
 
 from feed_parser import FeedParser
@@ -14,7 +15,18 @@ def _on_progress(update: dict):
     total = update.get("total", 0)
     url = update.get("current_product_url", "")
     msg = update.get("message", "")
-    st.session_state["progress_state"] = (processed, total, url, msg)
+    
+    # Throttle progress updates to prevent excessive UI refreshes
+    current_time = time.time()
+    last_update = st.session_state.get("last_progress_update", 0)
+    
+    # Only update if enough time has passed (throttle to max 2 updates per second)
+    if current_time - last_update > 0.5:
+        st.session_state["last_progress_update"] = current_time
+        st.session_state["progress_state"] = (processed, total, url, msg)
+    
+    # Store the latest update for immediate use without session state dependency
+    st.session_state["latest_progress"] = (processed, total, url, msg)
 
 
 def main():
@@ -116,13 +128,26 @@ def main():
             evaluator = ProductFeedEvaluator(api_key=api_key, model=model, locale=locale)
             progress_bar = st.progress(0)
             status = st.empty()
+            
+            # Initialize progress tracking
+            if "evaluation_started" not in st.session_state:
+                st.session_state["evaluation_started"] = True
+                st.session_state["last_progress_update"] = 0
 
             def on_progress_local(update: dict):
                 _on_progress(update)
-                processed, total, url, msg = st.session_state.get("progress_state", (0, len(products_df), "", ""))
+                # Use the latest progress data directly from the update
+                processed = update.get("processed", 0)
+                total = update.get("total", 0)
+                url = update.get("current_product_url", "")
+                msg = update.get("message", "")
+                
                 if total:
                     progress_bar.progress(min(processed / total, 1.0))
                 status.write(f"Processed {processed}/{total} {('- ' + url) if url else ''}")
+                
+                # Small delay to prevent rapid UI updates
+                time.sleep(0.01)
 
             with st.spinner("Running evaluation (this may take a while)…"):
                 results_df = evaluator.evaluate_products_batch(
@@ -150,8 +175,8 @@ def main():
             mime="text/csv",
         )
         
-        # Batch processing status
-        if enable_batch_saving:
+        # Batch processing status (only show if not currently running evaluation)
+        if enable_batch_saving and not start:
             st.markdown("---")
             st.subheader("Batch Processing Status")
             
@@ -199,10 +224,11 @@ def main():
                 
                 # Show output directory info
                 output_dir = "output"
-                if os.path.exists(output_dir):
-                    batch_files = [f for f in os.listdir(output_dir) if f.startswith("batch_") and f.endswith(".json")]
+                batches_dir = os.path.join(output_dir, "batches")
+                if os.path.exists(batches_dir):
+                    batch_files = [f for f in os.listdir(batches_dir) if f.startswith("batch_") and f.endswith(".json")]
                     if batch_files:
-                        st.info(f"📁 Saved {len(batch_files)} batch files in '{output_dir}' directory")
+                        st.info(f"📁 Saved {len(batch_files)} batch files in '{batches_dir}' directory")
                         st.caption("Batch files are automatically saved to prevent data loss on large runs")
                         
                         # Cleanup option
