@@ -33,6 +33,20 @@ def main():
         num_questions = st.slider("Questions per product", min_value=4, max_value=24, value=12, step=1)
         batch_size = st.slider("Batch size", min_value=5, max_value=100, value=20, step=5)
 
+        debug = st.checkbox("Debug mode (include error rows)", value=False)
+
+        if st.button("Test OpenAI API"):
+            if not api_key:
+                st.error("No API key provided.")
+            else:
+                try:
+                    # Lightweight ping using OpenAI client creation
+                    from openai import OpenAI
+                    _ = OpenAI(api_key=api_key)
+                    st.success("OpenAI client initialized successfully.")
+                except Exception as e:
+                    st.error(f"OpenAI initialization failed: {e}")
+
         st.markdown("---")
         st.subheader("Selected fields")
         default_fields = ["title", "brand", "product_type", "google_product_category", "price", "availability", "color", "size", "material", "link", "description", "image_link"]
@@ -101,11 +115,14 @@ def main():
                 num_questions=num_questions,
                 batch_size=batch_size,
                 on_progress=on_progress_local,
-                debug=False,
+                debug=debug,
             )
 
-        st.success("Evaluation complete")
-        st.dataframe(results_df.head(50), use_container_width=True)
+        if results_df.empty:
+            st.error("Evaluation returned no rows. Enable Debug mode to capture errors, and verify your OpenAI API key.")
+        else:
+            st.success("Evaluation complete")
+            st.dataframe(results_df.head(50), use_container_width=True)
 
         # CSV download
         csv_bytes = results_df.to_csv(index=False).encode("utf-8")
