@@ -36,6 +36,18 @@ class FeedParser:
             
             # Handle both RSS and Atom feeds
             items = root.findall('.//item') or root.findall('.//entry')
+
+            # Fallback: if the root itself is a single item/entry node
+            if not items:
+                root_tag = root.tag
+                if '}' in root_tag:
+                    root_local = root_tag.split('}', 1)[1]
+                elif ':' in root_tag:
+                    root_local = root_tag.split(':', 1)[1]
+                else:
+                    root_local = root_tag
+                if root_local in ("item", "entry"):
+                    items = [root]
             
             for item in items:
                 product = self._extract_product_data(item)
