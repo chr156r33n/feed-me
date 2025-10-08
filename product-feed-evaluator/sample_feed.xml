@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Sample Product Feed</title>
+    <link>https://example-store.com</link>
+    <description>Sample Google Shopping feed for testing</description>
+    
+    <item>
+      <g:id>12345</g:id>
+      <title>Modern Wireless Bluetooth Headphones</title>
+      <description>High-quality wireless headphones with noise cancellation, 30-hour battery life, and premium sound quality. Perfect for music lovers and professionals.</description>
+      <link>https://example-store.com/products/wireless-headphones</link>
+      <g:image_link>https://example-store.com/images/headphones.jpg</g:image_link>
+      <g:brand>AudioTech</g:brand>
+      <g:price>199.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Electronics > Audio > Headphones</g:product_type>
+      <g:color>Black</g:color>
+      <g:material>Plastic, Metal</g:material>
+      <g:gtin>1234567890123</g:gtin>
+      <g:mpn>ATH-WH1000XM4</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12346</g:id>
+      <title>Ergonomic Office Chair</title>
+      <description>Comfortable ergonomic office chair with lumbar support, adjustable height, and breathable mesh back. Ideal for long work sessions.</description>
+      <link>https://example-store.com/products/office-chair</link>
+      <g:image_link>https://example-store.com/images/chair.jpg</g:image_link>
+      <g:brand>ComfortSeat</g:brand>
+      <g:price>299.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Furniture > Office Furniture > Chairs</g:product_type>
+      <g:color>Black</g:color>
+      <g:material>Mesh, Steel, Plastic</g:material>
+      <g:gtin>2345678901234</g:gtin>
+      <g:mpn>CS-EC-001</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12347</g:id>
+      <title>Stainless Steel Water Bottle</title>
+      <description>Insulated stainless steel water bottle that keeps drinks cold for 24 hours or hot for 12 hours. BPA-free and leak-proof design.</description>
+      <link>https://example-store.com/products/water-bottle</link>
+      <g:image_link>https://example-store.com/images/bottle.jpg</g:image_link>
+      <g:brand>HydroMax</g:brand>
+      <g:price>24.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Sports & Outdoors > Hydration</g:product_type>
+      <g:color>Silver</g:color>
+      <g:material>Stainless Steel</g:material>
+      <g:gtin>3456789012345</g:gtin>
+      <g:mpn>HM-SB-500</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12348</g:id>
+      <title>Smart Fitness Watch</title>
+      <description>Advanced fitness tracking watch with heart rate monitoring, GPS, sleep tracking, and 7-day battery life. Water-resistant up to 50 meters.</description>
+      <link>https://example-store.com/products/fitness-watch</link>
+      <g:image_link>https://example-store.com/images/watch.jpg</g:image_link>
+      <g:brand>FitTech</g:brand>
+      <g:price>249.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Electronics > Wearables > Smartwatches</g:product_type>
+      <g:color>Black</g:color>
+      <g:material>Aluminum, Silicone</g:material>
+      <g:gtin>4567890123456</g:gtin>
+      <g:mpn>FT-SW-2024</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12349</g:id>
+      <title>Organic Cotton T-Shirt</title>
+      <description>Soft, comfortable organic cotton t-shirt made from 100% organic cotton. Available in multiple colors and sizes. Machine washable.</description>
+      <link>https://example-store.com/products/tshirt</link>
+      <g:image_link>https://example-store.com/images/tshirt.jpg</g:image_link>
+      <g:brand>EcoWear</g:brand>
+      <g:price>19.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Clothing & Accessories > Shirts & Tops</g:product_type>
+      <g:color>White</g:color>
+      <g:size>M</g:size>
+      <g:material>100% Organic Cotton</g:material>
+      <g:gtin>5678901234567</g:gtin>
+      <g:mpn>EW-TS-001</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12350</g:id>
+      <title>LED Desk Lamp</title>
+      <description>Adjustable LED desk lamp with touch controls, multiple brightness levels, and USB charging port. Energy-efficient and eye-friendly lighting.</description>
+      <link>https://example-store.com/products/desk-lamp</link>
+      <g:image_link>https://example-store.com/images/lamp.jpg</g:image_link>
+      <g:brand>LumiTech</g:brand>
+      <g:price>59.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Home & Garden > Lighting > Desk Lamps</g:product_type>
+      <g:color>White</g:color>
+      <g:material>Aluminum, Plastic</g:material>
+      <g:gtin>6789012345678</g:gtin>
+      <g:mpn>LT-DL-2024</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12351</g:id>
+      <title>Ceramic Coffee Mug</title>
+      <description>Handcrafted ceramic coffee mug with ergonomic handle and microwave-safe design. Perfect for coffee, tea, or hot chocolate.</description>
+      <link>https://example-store.com/products/coffee-mug</link>
+      <g:image_link>https://example-store.com/images/mug.jpg</g:image_link>
+      <g:brand>Artisan Pottery</g:brand>
+      <g:price>12.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Home & Garden > Kitchen & Dining > Drinkware</g:product_type>
+      <g:color>Blue</g:color>
+      <g:material>Ceramic</g:material>
+      <g:gtin>7890123456789</g:gtin>
+      <g:mpn>AP-CM-001</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12352</g:id>
+      <title>Yoga Mat</title>
+      <description>Non-slip yoga mat made from eco-friendly TPE material. Extra thick for comfort and includes carrying strap. Perfect for yoga, pilates, and fitness.</description>
+      <link>https://example-store.com/products/yoga-mat</link>
+      <g:image_link>https://example-store.com/images/yoga-mat.jpg</g:image_link>
+      <g:brand>ZenFit</g:brand>
+      <g:price>34.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Sports & Outdoors > Exercise & Fitness > Yoga</g:product_type>
+      <g:color>Purple</g:color>
+      <g:material>TPE (Thermoplastic Elastomer)</g:material>
+      <g:gtin>8901234567890</g:gtin>
+      <g:mpn>ZF-YM-001</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12353</g:id>
+      <title>Wireless Phone Charger</title>
+      <description>Fast wireless charging pad compatible with iPhone and Android devices. LED indicator and safety features included.</description>
+      <link>https://example-store.com/products/wireless-charger</link>
+      <g:image_link>https://example-store.com/images/charger.jpg</g:image_link>
+      <g:brand>PowerTech</g:brand>
+      <g:price>29.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Electronics > Mobile Phone Accessories > Chargers</g:product_type>
+      <g:color>Black</g:color>
+      <g:material>Plastic, Metal</g:material>
+      <g:gtin>9012345678901</g:gtin>
+      <g:mpn>PT-WC-001</g:mpn>
+    </item>
+    
+    <item>
+      <g:id>12354</g:id>
+      <title>Bamboo Cutting Board</title>
+      <description>Eco-friendly bamboo cutting board with juice groove and non-slip feet. Naturally antimicrobial and easy to clean. Perfect for food preparation.</description>
+      <link>https://example-store.com/products/cutting-board</link>
+      <g:image_link>https://example-store.com/images/cutting-board.jpg</g:image_link>
+      <g:brand>EcoKitchen</g:brand>
+      <g:price>24.99</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:product_type>Home & Garden > Kitchen & Dining > Kitchen Tools</g:product_type>
+      <g:color>Natural</g:color>
+      <g:material>Bamboo</g:material>
+      <g:gtin>0123456789012</g:gtin>
+      <g:mpn>EK-CB-001</g:mpn>
+    </item>
+    
+  </channel>
+</rss>
