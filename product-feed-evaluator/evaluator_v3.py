@@ -21,6 +21,8 @@ import html
 import time
 import logging
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 from typing import Any, Dict, List, Tuple, Callable, Optional
 from pathlib import Path
 
@@ -119,6 +121,35 @@ PREFERRED_ORDER = [
 ]
 
 RE_JSON_PREFIX = re.compile(r"^[\s\S]*?(\[|\{)\s*")
+
+
+class RateLimitedError(RuntimeError):
+    def __init__(self, message: str, retry_after_seconds: Optional[float] = None):
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
+
+class QuotaExceededError(RuntimeError):
+    pass
+
+
+def _looks_like_rate_limit(message: str) -> bool:
+    m = (message or "").lower()
+    return (
+        "429" in m
+        or "rate limit" in m
+        or "too many requests" in m
+        or ("please try again" in m and "seconds" in m)
+    )
+
+
+def _looks_like_quota(message: str) -> bool:
+    m = (message or "").lower()
+    return (
+        "quota" in m
+        or "exceeded your current quota" in m
+        or "insufficient_quota" in m
+    )
 
 
 def _clean_text(val: Any) -> str:
@@ -221,6 +252,12 @@ class _LLM:
                 if attempt < max_retries:
                     logger.info(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
+        # Classification for better upstream handling
+        msg = str(last_err or "")
+        if _looks_like_rate_limit(msg):
+            raise RateLimitedError(msg)
+        if _looks_like_quota(msg):
+            raise QuotaExceededError(msg)
         raise last_err  # type: ignore
 
 
@@ -231,7 +268,28 @@ class BatchSaver:
         # Use a more isolated directory structure to avoid Streamlit file watcher
         self.output_dir = Path(output_dir) / "batches"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Maintain an active session file to enable safe resume across app reruns
+        self._active_session_file = self.output_dir / "session_active.json"
+        self.timestamp = self._load_or_create_session_timestamp()
+
+    def _load_or_create_session_timestamp(self) -> str:
+        """Reuse active session timestamp if present, otherwise create new."""
+        try:
+            if self._active_session_file.exists():
+                with open(self._active_session_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    ts = data.get('timestamp')
+                    if ts:
+                        return ts
+        except Exception:
+            pass
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        try:
+            with open(self._active_session_file, 'w', encoding='utf-8') as f:
+                json.dump({'timestamp': ts}, f)
+        except Exception:
+            pass
+        return ts
         
     def get_batch_file(self, batch_num: int) -> Path:
         """Get the file path for a specific batch."""
@@ -326,6 +384,14 @@ class BatchSaver:
             })
         
         return sorted(sessions, key=lambda x: x['timestamp'], reverse=True)
+
+    def finalize_session(self) -> None:
+        """Mark the session complete so future runs start fresh."""
+        try:
+            if self._active_session_file.exists():
+                self._active_session_file.unlink()
+        except Exception:
+            pass
 
 
 class ProductFeedEvaluator:
@@ -431,64 +497,61 @@ class ProductFeedEvaluator:
                     # Don't let progress saving errors interrupt evaluation
                     logger.warning(f"Failed to save progress: {e}")
 
-        # Process products in batches
-        current_batch = []
-        batch_num = 0
-        
+        # Concurrency settings: bounded parallelism with rate limiter gating per call
+        concurrency = max(1, min(4, batch_size // 10 if batch_size >= 10 else 1))
+        logger.info(f"Using bounded concurrency: {concurrency}")
+
+        # Prepare tasks
+        tasks: List[Tuple[int, Dict[str, Any]]] = []
         for i, (_, prod) in enumerate(products_df.iterrows(), start=1):
-            # Skip if resuming and we've already processed this product
             if i <= start_index:
                 continue
-            
-            # Health check every 50 products
-            if i % 50 == 0:
-                health = self.health_checker.check_health()
-                if self.health_checker.should_pause_evaluation():
-                    logger.warning(f"Pausing evaluation due to health issues: {health['issues']}")
-                    # Save current progress
-                    if current_batch:
-                        self.batch_saver.save_batch(batch_num, current_batch)
-                    self.batch_saver.save_progress({
-                        'last_processed': i - 1,
-                        'total': total,
-                        'timestamp': datetime.now().isoformat(),
-                        'health_issues': health['issues']
-                    })
-                    raise Exception(f"Evaluation paused due to health issues: {health['issues']}")
-                
-            # Rate limiting check
-            if not self.rate_limiter.can_make_request():
-                wait_time = self.rate_limiter.get_wait_time()
-                logger.info(f"Rate limit reached, waiting {wait_time:.1f} seconds...")
-                time.sleep(wait_time)
-            
-            product: Dict[str, Any] = prod.to_dict()
-            product_url = _clean_text(product.get("link", ""))
-            
-            try:
-                logger.info(f"Processing product {i}/{total}: {product_url}")
-                
-                # Record request for rate limiting
-                self.rate_limiter.record_request()
-                
-                # Step 1: Generate candidate questions
-                candidates = self._gen_questions(product, selected_fields, num_questions)
-                
-                # Step 2: QA/refine questions
-                final_qs = self._qa_questions(product, selected_fields, num_questions, candidates)
-                
-                # Step 3: Judge answers
-                judgements = self._judge_answers(product, selected_fields, final_qs)
+            tasks.append((i, prod.to_dict()))
 
-                # Compute scores
+        current_batch: List[Dict[str, Any]] = []
+        batch_num = 0
+        processed_count = 0
+        abort_event = threading.Event()
+
+        def process_one(idx: int, product: Dict[str, Any]) -> Tuple[int, Optional[Dict[str, Any]], str]:
+            product_url_local = _clean_text(product.get("link", ""))
+
+            def call_with_rate_limit(fn: Callable[[], Any]) -> Any:
+                # Gate each API call
+                attempt = 0
+                while True:
+                    if abort_event.is_set():
+                        raise RuntimeError("Aborted")
+                    if not self.rate_limiter.can_make_request():
+                        wait_time_local = self.rate_limiter.get_wait_time()
+                        time.sleep(max(0.1, wait_time_local))
+                        continue
+                    try:
+                        self.rate_limiter.record_request()
+                        return fn()
+                    except RateLimitedError:
+                        cooldown_local = min(2.0 * (2 ** attempt), 60.0)
+                        time.sleep(cooldown_local)
+                        attempt += 1
+                        if attempt >= 5:
+                            raise
+                    except QuotaExceededError:
+                        # Bubble up to stop everything
+                        raise
+
+            try:
+                # Step 1: candidates
+                candidates = call_with_rate_limit(lambda: self._gen_questions(product, selected_fields, num_questions))
+                # Step 2: refine
+                final_qs = call_with_rate_limit(lambda: self._qa_questions(product, selected_fields, num_questions, candidates))
+                # Step 3: judge
+                judgements = call_with_rate_limit(lambda: self._judge_answers(product, selected_fields, final_qs))
+
                 coverage_pct, yes_c, partial_c, no_c = compute_weighted_coverage(judgements)
                 unanswered_required = sum(1 for j in judgements if j.get("required") and j.get("verdict") in {"no", "partial"})
-
-                # Build contexts
-                short_ctx, name_plus_context = build_context(product, selected_fields)
-
+                _, name_plus_context = build_context(product, selected_fields)
                 row = {
-                    "product_url": product_url,
+                    "product_url": product_url_local,
                     "name_plus_context": name_plus_context,
                     "questions_json": json.dumps([{"question": q.get("question"), "taxonomy": q.get("taxonomy"), "required": bool(q.get("required", False))} for q in final_qs], ensure_ascii=False),
                     "judgements_json": json.dumps(judgements, ensure_ascii=False),
@@ -499,26 +562,22 @@ class ProductFeedEvaluator:
                     "unanswered_required_count": unanswered_required,
                     "context_fields": ",".join(selected_fields),
                 }
-                current_batch.append(row)
-                
+                return idx, row, product_url_local
             except Exception as e:
-                logger.error(f"Error processing product {i} ({product_url}): {e}")
-                
-                # Log detailed error information
+                # Log and optionally return error row
+                logger.error(f"Error processing product {idx} ({product_url_local}): {e}")
                 self.monitor.log_error(
-                    product_index=i,
-                    product_url=product_url,
+                    product_index=idx,
+                    product_url=product_url_local,
                     error=e,
-                    context={
-                        'selected_fields': selected_fields,
-                        'num_questions': num_questions,
-                        'batch_size': batch_size
-                    }
+                    context={'selected_fields': selected_fields,'num_questions': num_questions,'batch_size': batch_size}
                 )
-                
+                if isinstance(e, QuotaExceededError):
+                    abort_event.set()
+                    raise
                 if debug:
-                    error_payload = {
-                        "product_url": product_url,
+                    return idx, {
+                        "product_url": product_url_local,
                         "name_plus_context": "",
                         "questions_json": "[]",
                         "judgements_json": json.dumps([{ "error": str(e) }]),
@@ -528,20 +587,59 @@ class ProductFeedEvaluator:
                         "coverage_pct": 0.0,
                         "unanswered_required_count": 0,
                         "context_fields": ",".join(selected_fields),
-                    }
-                    current_batch.append(error_payload)
-                progress(i, product_url, msg=f"Error: {e}")
-            finally:
-                # Log progress
-                self.monitor.log_progress(i, total, product_url)
-                progress(i, product_url)
-            
-            # Save batch when it reaches the specified size
-            if len(current_batch) >= batch_size:
-                self.batch_saver.save_batch(batch_num, current_batch)
-                batch_num += 1
-                current_batch = []
-                logger.info(f"Saved batch {batch_num - 1}, processed {i}/{total} products")
+                    }, product_url_local
+                return idx, None, product_url_local
+
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            future_to_idx = {executor.submit(process_one, idx, prod): idx for idx, prod in tasks}
+            for fut in as_completed(future_to_idx):
+                idx = future_to_idx[fut]
+                try:
+                    finished_idx, row, url_for_msg = fut.result()
+                except QuotaExceededError as qee:
+                    progress(processed_count, "", msg="Quota exceeded. Stopping evaluation.")
+                    # Save current partial batch and progress
+                    if current_batch:
+                        self.batch_saver.save_batch(batch_num, current_batch)
+                    self.batch_saver.save_progress({
+                        'last_processed': start_index + processed_count,
+                        'total': total,
+                        'timestamp': datetime.now().isoformat(),
+                        'reason': 'quota_exceeded'
+                    })
+                    raise
+                except Exception as e:
+                    # Already logged inside; just continue
+                    row = None
+                    url_for_msg = ""
+                processed_count += 1
+
+                # Health check periodically based on completions
+                if processed_count % 50 == 0:
+                    health = self.health_checker.check_health()
+                    if self.health_checker.should_pause_evaluation():
+                        logger.warning(f"Pausing evaluation due to health issues: {health['issues']}")
+                        if current_batch:
+                            self.batch_saver.save_batch(batch_num, current_batch)
+                        self.batch_saver.save_progress({
+                            'last_processed': start_index + processed_count,
+                            'total': total,
+                            'timestamp': datetime.now().isoformat(),
+                            'health_issues': health['issues']
+                        })
+                        raise Exception(f"Evaluation paused due to health issues: {health['issues']}")
+
+                # Progress update
+                self.monitor.log_progress(processed_count, total, url_for_msg)
+                progress(processed_count, url_for_msg)
+
+                if row is not None:
+                    current_batch.append(row)
+                    if len(current_batch) >= batch_size:
+                        self.batch_saver.save_batch(batch_num, current_batch)
+                        batch_num += 1
+                        current_batch = []
+                        logger.info(f"Saved batch {batch_num - 1}, processed {processed_count}/{total} products")
         
         # Save any remaining products in the final batch
         if current_batch:
@@ -551,14 +649,26 @@ class ProductFeedEvaluator:
         # Consolidate all results
         logger.info("Consolidating all batch results...")
         all_results = self.batch_saver.consolidate_results()
+        # Exactly-once: remove duplicates by product_url if present
+        seen = set()
+        deduped: List[Dict[str, Any]] = []
+        for row in all_results:
+            key = row.get("product_url")
+            if key and key in seen:
+                continue
+            if key:
+                seen.add(key)
+            deduped.append(row)
         
         # Clean up progress file
         progress_file = self.batch_saver.get_progress_file()
         if progress_file.exists():
             progress_file.unlink()
         
-        logger.info(f"Evaluation complete. Total results: {len(all_results)}")
-        return pd.DataFrame(all_results)
+        # Finalize session so next run starts a fresh session id
+        self.batch_saver.finalize_session()
+        logger.info(f"Evaluation complete. Total results: {len(deduped)} (deduped)")
+        return pd.DataFrame(deduped)
 
     def resume_evaluation(self, products_df: pd.DataFrame) -> pd.DataFrame:
         """Resume evaluation from saved batches."""
