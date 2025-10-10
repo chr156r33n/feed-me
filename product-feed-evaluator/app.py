@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from feed_parser import FeedParser
 from evaluator_v3 import ProductFeedEvaluator
+from monitoring import create_monitoring_suite
 
 
 @st.cache_data
@@ -216,15 +217,35 @@ def main():
                 total = update.get("total", 0)
                 url = update.get("current_product_url", "")
                 msg = update.get("message", "")
-                
+
                 if total:
                     st.session_state.progress_bar.progress(min(processed / total, 1.0))
-                st.session_state.status_placeholder.write(f"Processed {processed}/{total} {('- ' + url) if url else ''}")
-                
+                status_text = f"Processed {processed}/{total}"
+                if url:
+                    status_text += f" - {url}"
+                if msg:
+                    # Surface rate limits and quota notices clearly
+                    if "quota" in msg.lower():
+                        st.warning(msg)
+                    elif "429" in msg or "rate limit" in msg.lower():
+                        st.info(msg)
+                    else:
+                        st.caption(msg)
+                    status_text += f"\n{msg}"
+
+                st.session_state.status_placeholder.write(status_text)
+
                 # Small delay to prevent rapid UI updates
                 time.sleep(0.01)
 
             with st.spinner("Running evaluation (this may take a while)…"):
+                # Adjust rate limiter based on chosen batch size to avoid 429s
+                # Conservative rpm derived from batch size
+                safe_rpm = max(20, int(60 / max(1, st.session_state.batch_size // 10)))
+                evaluator.monitor, evaluator.rate_limiter, evaluator.memory_monitor, evaluator.health_checker = create_monitoring_suite(
+                    output_dir="output", max_requests_per_minute=safe_rpm, max_requests_per_hour=2000
+                )
+
                 results_df = evaluator.evaluate_products_batch(
                     products_df=products_df,
                     selected_fields=st.session_state.selected_fields,
@@ -307,7 +328,22 @@ def main():
                 batch_files = [f for f in os.listdir(batches_dir) if f.startswith("batch_") and f.endswith(".json")]
                 if batch_files:
                     st.info(f"📁 Saved {len(batch_files)} batch files in '{batches_dir}' directory")
-                    st.caption("Batch files are automatically saved to prevent data loss on large runs")
+                    st.caption("Batch files are automatically saved to prevent data loss on large runs. You can download them below.")
+
+                    # Offer per-batch downloads
+                    for fname in sorted(batch_files):
+                        fpath = os.path.join(batches_dir, fname)
+                        try:
+                            with open(fpath, "rb") as f:
+                                st.download_button(
+                                    label=f"Download {fname}",
+                                    data=f.read(),
+                                    file_name=fname,
+                                    mime="application/json",
+                                    key=f"dl_{fname}",
+                                )
+                        except Exception as e:
+                            st.warning(f"Failed to read {fname}: {e}")
                     
                     # Cleanup option
                     if st.button("🗑️ Clean up batch files", help="Remove all batch files after successful evaluation"):

@@ -9,6 +9,7 @@ import json
 import time
 import logging
 import traceback
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Callable
 from pathlib import Path
@@ -105,59 +106,74 @@ class EvaluationMonitor:
 
 class RateLimiter:
     """Handles API rate limiting and backoff strategies."""
-    
+
     def __init__(self, max_requests_per_minute: int = 50, max_requests_per_hour: int = 1000):
         self.max_rpm = max_requests_per_minute
         self.max_rph = max_requests_per_hour
-        self.request_times = []
+        self.request_times: List[datetime] = []
         self.hourly_requests = 0
         self.last_hour_reset = datetime.now()
-    
+        self._lock = threading.Lock()
+        self._cooldown_until: Optional[datetime] = None
+
     def can_make_request(self) -> bool:
         """Check if we can make a request without hitting rate limits."""
         now = datetime.now()
-        
-        # Reset hourly counter if needed
-        if now - self.last_hour_reset > timedelta(hours=1):
-            self.hourly_requests = 0
-            self.last_hour_reset = now
-        
-        # Check hourly limit
-        if self.hourly_requests >= self.max_rph:
-            return False
-        
-        # Check minute limit
-        minute_ago = now - timedelta(minutes=1)
-        recent_requests = [t for t in self.request_times if t > minute_ago]
-        
-        return len(recent_requests) < self.max_rpm
-    
+        with self._lock:
+            if self._cooldown_until and now < self._cooldown_until:
+                return False
+
+            # Reset hourly counter if needed
+            if now - self.last_hour_reset > timedelta(hours=1):
+                self.hourly_requests = 0
+                self.last_hour_reset = now
+
+            # Check hourly limit
+            if self.hourly_requests >= self.max_rph:
+                return False
+
+            # Check minute limit
+            minute_ago = now - timedelta(minutes=1)
+            recent_requests = [t for t in self.request_times if t > minute_ago]
+
+            return len(recent_requests) < self.max_rpm
+
     def record_request(self):
         """Record that a request was made."""
         now = datetime.now()
-        self.request_times.append(now)
-        self.hourly_requests += 1
-        
-        # Clean old request times
-        minute_ago = now - timedelta(minutes=1)
-        self.request_times = [t for t in self.request_times if t > minute_ago]
-    
+        with self._lock:
+            self.request_times.append(now)
+            self.hourly_requests += 1
+
+            # Clean old request times
+            minute_ago = now - timedelta(minutes=1)
+            self.request_times = [t for t in self.request_times if t > minute_ago]
+
     def get_wait_time(self) -> float:
-        """Get the time to wait before making the next request."""
-        if not self.request_times:
-            return 0.0
-        
+        """Get the time to wait before making the next request or cooldown expiry."""
         now = datetime.now()
-        minute_ago = now - timedelta(minutes=1)
-        recent_requests = [t for t in self.request_times if t > minute_ago]
-        
-        if len(recent_requests) >= self.max_rpm:
-            # Wait until the oldest request is more than a minute old
-            oldest_recent = min(recent_requests)
-            wait_until = oldest_recent + timedelta(minutes=1)
-            return max(0.0, (wait_until - now).total_seconds())
-        
-        return 0.0
+        with self._lock:
+            if self._cooldown_until and now < self._cooldown_until:
+                return max(0.0, (self._cooldown_until - now).total_seconds())
+
+            if not self.request_times:
+                return 0.0
+
+            minute_ago = now - timedelta(minutes=1)
+            recent_requests = [t for t in self.request_times if t > minute_ago]
+
+            if len(recent_requests) >= self.max_rpm:
+                # Wait until the oldest request is more than a minute old
+                oldest_recent = min(recent_requests)
+                wait_until = oldest_recent + timedelta(minutes=1)
+                return max(0.0, (wait_until - now).total_seconds())
+
+            return 0.0
+
+    def enter_cooldown(self, seconds: float) -> None:
+        """Enter a temporary cooldown period (e.g., after a 429)."""
+        with self._lock:
+            self._cooldown_until = datetime.now() + timedelta(seconds=seconds)
 
 
 class MemoryMonitor:
@@ -260,11 +276,15 @@ class EvaluationHealthChecker:
         return health['overall_status'] in ['rate_limited', 'memory_pressure']
 
 
-def create_monitoring_suite(output_dir: str = "output") -> tuple:
+def create_monitoring_suite(
+    output_dir: str = "output",
+    max_requests_per_minute: int = 50,
+    max_requests_per_hour: int = 1000,
+) -> tuple:
     """Create a complete monitoring suite."""
     monitor = EvaluationMonitor(output_dir)
-    rate_limiter = RateLimiter()
+    rate_limiter = RateLimiter(max_requests_per_minute=max_requests_per_minute, max_requests_per_hour=max_requests_per_hour)
     memory_monitor = MemoryMonitor()
     health_checker = EvaluationHealthChecker(monitor, rate_limiter, memory_monitor)
-    
+
     return monitor, rate_limiter, memory_monitor, health_checker
